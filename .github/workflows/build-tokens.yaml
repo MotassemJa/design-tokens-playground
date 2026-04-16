@@ -27,7 +27,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'npm'
 
       - name: Install dependencies
@@ -36,25 +36,25 @@ jobs:
       - name: Build tokens
         run: npm run build
 
-      - name: Validate build output
+      - name: Validate dist output
         run: |
-          if [ ! -d "build" ] || [ -z "$(ls -A build)" ]; then
+          if [ ! -d "dist" ] || [ -z "$(ls -A dist)" ]; then
             echo "Build failed - no output generated"
             exit 1
           fi
           echo "Build successful!"
-          find build -type f -name "*.css" -o -name "*.json" -o -name "*.js" | head -20
+          find dist -type f -name "*.css" -o -name "*.json" -o -name "*.js" | head -20
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: design-tokens-build
-          path: build/
+          path: dist/
           retention-days: 30
 
       - name: Comment build preview on PR
         if: github.event_name == 'pull_request'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const fs = require('fs');
@@ -62,7 +62,7 @@ jobs:
             
             // Read a sample of built tokens for preview
             let cssPreview = '';
-            const cssPath = 'build/css/variables.css';
+            const cssPath = 'dist/css/variables.css';
             if (fs.existsSync(cssPath)) {
               const content = fs.readFileSync(cssPath, 'utf8');
               const lines = content.split('\n').slice(0, 30);
@@ -131,12 +131,12 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: design-tokens-build
-          path: build/
+          path: dist/
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
           registry-url: '[npm.pkg.github.com](https://npm.pkg.github.com)'
           scope: '@your-org'
 

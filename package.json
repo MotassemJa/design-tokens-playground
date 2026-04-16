@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "",
   "type": "module",
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "node src/index.js"
   },
