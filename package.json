@@ -1,0 +1,22 @@
+{
+  "name": "design-tokens-playground",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MotassemJa/design-tokens-playground.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/MotassemJa/design-tokens-playground/issues"
+  },
+  "homepage": "https://github.com/MotassemJa/design-tokens-playground#readme",
+  "devDependencies": {
+    "style-dictionary": "^5.4.0"
+  }
+}
