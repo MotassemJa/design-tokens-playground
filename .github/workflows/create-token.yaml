@@ -47,7 +47,7 @@ jobs:
       - name: Run create token script
         run: |
           npx tsx .github/scripts/create-token.ts \
-            --category "${{ steps.parse.outputs.parsed_category[0] }}" \
+            --category "${{ fromJson(steps.parse.outputs.parsed_category)[0] }}" \
             --name "${{ steps.parse.outputs.parsed_token-name }}" \
             --value "${{ steps.parse.outputs.parsed_token-value }}" \
             --description "${{ steps.parse.outputs.parsed_description }}" \
