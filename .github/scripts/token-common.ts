@@ -13,7 +13,7 @@ export interface TokenObject {
 
 export interface TokenData {
   action: "create" | "update" | "delete";
-  category: string;
+  category: string[];
   name?: string;
   group?: string;
   tokenPath?: string;
@@ -35,32 +35,6 @@ export function parseTokenValue(value: string): TokenValue {
   }
 }
 
-export function normalizeInputValue(value?: string): string | undefined {
-  if (value === undefined) {
-    return undefined;
-  }
-
-  const trimmed = value.trim();
-  if (trimmed === "") {
-    return undefined;
-  }
-
-  if ((trimmed.startsWith("[") && trimmed.endsWith("]")) || (trimmed.startsWith("\"") && trimmed.endsWith("\""))) {
-    try {
-      const parsed = JSON.parse(trimmed);
-      if (Array.isArray(parsed)) {
-        return parsed.length > 0 ? String(parsed[0]) : undefined;
-      }
-      if (typeof parsed === "string") {
-        return parsed;
-      }
-    } catch {
-      return trimmed;
-    }
-  }
-
-  return trimmed;
-}
 
 export function setNestedValue(
   obj: TokenObject,
@@ -171,7 +145,7 @@ export function buildTokenPath(tokenName: string, tokenGroup?: string): string {
 }
 
 export function createToken(data: TokenData): void {
-  const filePath = getTokenFilePath(data.category);
+  const filePath = getTokenFilePath(data.category[0]);
   const tokens = readTokenFile(filePath);
 
   if (!data.name) {
@@ -187,7 +161,7 @@ export function createToken(data: TokenData): void {
   }
 
   if (data.category) {
-    tokenValue.$type = data.category;
+    tokenValue.$type = data.category[0];
   }
 
   if (getNestedValue(tokens, tokenPath)) {
@@ -203,7 +177,7 @@ export function createToken(data: TokenData): void {
 }
 
 export function updateToken(data: TokenData): void {
-  const filePath = getTokenFilePath(data.category);
+  const filePath = getTokenFilePath(data.category[0]);
   const tokens = readTokenFile(filePath);
 
   if (!data.tokenPath) {
@@ -234,7 +208,7 @@ export function updateToken(data: TokenData): void {
 }
 
 export function deleteToken(data: TokenData): void {
-  const filePath = getTokenFilePath(data.category);
+  const filePath = getTokenFilePath(data.category[0]);
   const tokens = readTokenFile(filePath);
 
   if (!data.tokenPath) {

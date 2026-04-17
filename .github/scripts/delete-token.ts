@@ -2,7 +2,7 @@
 
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
-import { deleteToken, normalizeInputValue, type TokenData } from "./token-common.ts";
+import { deleteToken, , type TokenData } from "./token-common.ts";
 
 const argv = await yargs(hideBin(process.argv))
   .option("category", {
@@ -22,8 +22,8 @@ const argv = await yargs(hideBin(process.argv))
 
 const tokenData: TokenData = {
   action: "delete",
-  category: normalizeInputValue(argv.category) ?? "",
-  tokenPath: normalizeInputValue(argv["token-path"]),
+  category: [argv.category ?? ""],
+  tokenPath: (argv["token-path"]),
 };
 
 deleteToken(tokenData);
