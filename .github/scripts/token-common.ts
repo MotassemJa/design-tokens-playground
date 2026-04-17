@@ -4,6 +4,7 @@ import { join } from "node:path";
 export interface TokenValue {
   $value: string | number | object | boolean;
   $description?: string;
+  $type?: string;
 }
 
 export interface TokenObject {
@@ -32,6 +33,33 @@ export function parseTokenValue(value: string): TokenValue {
   } catch {
     return { $value: value.trim() };
   }
+}
+
+export function normalizeInputValue(value?: string): string | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const trimmed = value.trim();
+  if (trimmed === "") {
+    return undefined;
+  }
+
+  if ((trimmed.startsWith("[") && trimmed.endsWith("]")) || (trimmed.startsWith("\"") && trimmed.endsWith("\""))) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) {
+        return parsed.length > 0 ? String(parsed[0]) : undefined;
+      }
+      if (typeof parsed === "string") {
+        return parsed;
+      }
+    } catch {
+      return trimmed;
+    }
+  }
+
+  return trimmed;
 }
 
 export function setNestedValue(
@@ -156,6 +184,10 @@ export function createToken(data: TokenData): void {
 
   if (data.description) {
     tokenValue.$description = data.description;
+  }
+
+  if (data.category) {
+    tokenValue.$type = data.category;
   }
 
   if (getNestedValue(tokens, tokenPath)) {

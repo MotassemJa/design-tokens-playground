@@ -4,7 +4,6 @@ on:
   issues:
     types: [opened, edited]
 
-
 permissions:
   contents: write
   issues: write
@@ -47,11 +46,16 @@ jobs:
 
       - name: Run create token script
         run: |
-          npx tsx .github/scripts/create-token.js -c "${{ steps.parse.outputs.parsed_category }}" -n "${{ steps.parse.outputs.parsed_token-name }}" --value "${{ steps.parse.outputs.parsed_token-value }}" -d "${{ steps.parse.outputs.parsed_description }}" -g "${{ steps.parse.outputs.parsed_token-group }}"
+          npx tsx .github/scripts/create-token.ts \
+            --category "${{ steps.parse.outputs.parsed_category }}" \
+            --name "${{ steps.parse.outputs.parsed_token-name }}" \
+            --value "${{ steps.parse.outputs.parsed_token-value }}" \
+            --description "${{ steps.parse.outputs.parsed_description }}" \
+            --group "${{ steps.parse.outputs.parsed_token-group }}"
 
       - name: Create token file and PR
         env:
-            GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git add .
           git commit -m "Create token ${{ steps.parse.outputs.parsed_category }}.${{ steps.parse.outputs.parsed_name }}"

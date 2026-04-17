@@ -2,7 +2,7 @@
 
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
-import { updateToken, type TokenData } from "./token-common.ts";
+import { updateToken, normalizeInputValue, type TokenData } from "./token-common.ts";
 
 const argv = await yargs(hideBin(process.argv))
   .option("category", {
@@ -33,10 +33,10 @@ const argv = await yargs(hideBin(process.argv))
 
 const tokenData: TokenData = {
   action: "update",
-  category: argv.category,
-  tokenPath: argv["token-path"],
-  value: argv.value,
-  description: argv.description,
+  category: normalizeInputValue(argv.category) ?? "",
+  tokenPath: normalizeInputValue(argv["token-path"]),
+  value: normalizeInputValue(argv.value),
+  description: normalizeInputValue(argv.description),
 };
 
 updateToken(tokenData);

@@ -2,7 +2,7 @@
 
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
-import { createToken, type TokenData } from "./token-common.ts";
+import { createToken, normalizeInputValue, type TokenData } from "./token-common.ts";
 
 const argv = await yargs(hideBin(process.argv))
   .option("category", {
@@ -38,11 +38,11 @@ const argv = await yargs(hideBin(process.argv))
 
 const tokenData: TokenData = {
   action: "create",
-  category: argv.category,
-  name: argv.name,
-  group: argv.group,
-  value: argv.value,
-  description: argv.description,
+  category: normalizeInputValue(argv.category) ?? "",
+  name: normalizeInputValue(argv.name),
+  group: normalizeInputValue(argv.group),
+  value: normalizeInputValue(argv.value),
+  description: normalizeInputValue(argv.description),
 };
 
 createToken(tokenData);
