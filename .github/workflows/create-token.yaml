@@ -51,8 +51,6 @@ jobs:
 
       - name: Create token file and PR
         run: |
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git checkout -b ${{ steps.branch.outputs.branch_name }}
           git add .
           git commit -m "Create token ${{ steps.parse.outputs.parsed_category }}.${{ steps.parse.outputs.parsed_name }}"
           git push origin ${{ steps.branch.outputs.branch_name }}
