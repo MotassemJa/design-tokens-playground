@@ -12,7 +12,7 @@
         "$type": "color"
       },
       "primary": {
-        "$value": "{bright-cyan}",
+        "$value": "{mosaic.color.bright-cyan}",
         "$description": "Primary brand color",
         "$type": "color"
       }
