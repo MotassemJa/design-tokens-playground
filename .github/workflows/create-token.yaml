@@ -1,0 +1,60 @@
+name: Create Design Token
+
+on:
+  issues:
+    types: [opened, edited]
+
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  create-token:
+    if: contains(github.event.issue.labels.*.name, 'token-request') && contains(github.event.issue.labels.*.name, 'create')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Parse creation issue
+        id: parse
+        uses: issue-ops/parser@v5
+        with:
+          body: ${{ github.event.issue.body }}
+          issue-form-template: create-token.yaml
+
+      - name: Create branch for changes
+        id: branch
+        run: |
+          BRANCH_NAME="token-request/${{ github.event.issue.number }}-$(echo '${{ github.event.issue.title }}' | sed 's/\[.*\] //' | tr '[:upper:]' '[:lower:]' | tr ' ' '-' | tr -cd '[:alnum:]-' | head -c 50)"
+          echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH_NAME"
+
+      - name: Run create token script
+        run: |
+          npx tsx .github/scripts/create-token.js -c "${{ steps.parse.outputs.parsed_category }}" -n "${{ steps.parse.outputs.parsed_name }}" --value "${{ steps.parse.outputs.parsed_value }}" -d "${{ steps.parse.outputs.parsed_description }}" -g "${{ steps.parse.outputs.parsed_token-group }}"
+
+      - name: Create token file and PR
+        run: |
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b ${{ steps.branch.outputs.branch_name }}
+          git add .
+          git commit -m "Create token ${{ steps.parse.outputs.parsed_category }}.${{ steps.parse.outputs.parsed_name }}"
+          git push origin ${{ steps.branch.outputs.branch_name }}
+
+          gh pr create --title "Create token ${{ steps.parse.outputs.parsed_category }}.${{ steps.parse.outputs.parsed_name }}" --body "This PR creates the design token `${{ steps.parse.outputs.parsed_category }}.${{ steps.parse.outputs.parsed_name }}` as requested in #${{ github.event.issue.number }}." --base main
