@@ -1,0 +1,10 @@
+{
+  "mosaic": {
+    "color": {
+      "warm-pink": {
+        "$value": "#F25E86",
+        "$description": "warm pink raw color"
+      }
+    }
+  }
+}
