@@ -82,7 +82,7 @@ jobs:
       - name: Process token change
         id: process
         run: |
-          node .github/scripts/process-token.js '${{ steps.parse.outputs.token_data }}'
+          npx tsx .github/scripts/process-token.ts '${{ steps.parse.outputs.token_data }}'
 
       - name: Build tokens to validate
         run: npm run build
