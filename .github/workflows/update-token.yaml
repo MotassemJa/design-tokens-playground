@@ -55,7 +55,9 @@ jobs:
       - name: Run update token script
         run: |
           npx tsx .github/scripts/update-token.ts \
-            --category "${{ fromJson(steps.parse.outputs.parsed_category)[0] }}" \
+            --hierarchy-level "${{ steps.parse.outputs['parsed_hierarchy-level'] != '' && fromJson(steps.parse.outputs['parsed_hierarchy-level'])[0] || '' }}" \
+            --domain "${{ steps.parse.outputs.parsed_domain != '' && fromJson(steps.parse.outputs.parsed_domain)[0] || '' }}" \
+            --category "${{ steps.parse.outputs.parsed_category != '' && fromJson(steps.parse.outputs.parsed_category)[0] || '' }}" \
             --token-path "${{ steps.parse.outputs.parsed_token-path }}" \
             --value "${{ steps.parse.outputs.parsed_new-value }}"
 
@@ -87,7 +89,8 @@ jobs:
 
             ### Details
             - **Action**: UPDATE
-            - **Category**: ${tokenData.category}
+            - **Hierarchy Level**: ${tokenData['hierarchy-level'] || 'N/A'}
+            - **Domain**: ${tokenData.domain || tokenData.category || 'N/A'}
             - **Token**: ${tokenData['token-path']}
             - **Current Value**: \`${tokenData['current-value']}\`
             - **New Value**: \`${tokenData['new-value']}\`

@@ -5,11 +5,20 @@ import { hideBin } from "yargs/helpers";
 import { updateToken, type TokenData } from "./token-common.ts";
 
 const argv = await yargs(hideBin(process.argv))
+  .option("hierarchy-level", {
+    alias: "l",
+    type: "string",
+    description: "Hierarchy level (universal, system, semantic, component)",
+  })
+  .option("domain", {
+    alias: "m",
+    type: "string",
+    description: "Token domain/category",
+  })
   .option("category", {
     alias: "c",
     type: "string",
-    description: "Token category (e.g., color, typography)",
-    demandOption: true,
+    description: "Legacy token category",
   })
   .option("token-path", {
     alias: "p",
@@ -33,7 +42,9 @@ const argv = await yargs(hideBin(process.argv))
 
 const tokenData: TokenData = {
   action: "update",
-  category: argv.category ?? "",
+  category: argv.category,
+  hierarchyLevel: argv["hierarchy-level"],
+  domain: argv.domain,
   tokenPath: argv["token-path"],
   value: argv.value,
   description: argv.description,

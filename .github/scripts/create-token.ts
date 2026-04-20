@@ -5,11 +5,22 @@ import { hideBin } from "yargs/helpers";
 import { createToken, type TokenData } from "./token-common.ts";
 
 const argv = await yargs(hideBin(process.argv))
-  .option("category", {
-    alias: "c",
+  .option("hierarchy-level", {
+    alias: "l",
     type: "string",
-    description: "Token category (e.g., color, typography)",
+    description: "Hierarchy level (universal, system, semantic, component)",
     demandOption: true,
+  })
+  .option("domain", {
+    alias: "m",
+    type: "string",
+    description: "Token domain/category (color, spacing, typography, button, etc.)",
+    demandOption: true,
+  })
+  .option("theme", {
+    alias: "t",
+    type: "string",
+    description: "Theme for system tokens (light, dark, high-contrast, universal)",
   })
   .option("name", {
     alias: "n",
@@ -26,7 +37,17 @@ const argv = await yargs(hideBin(process.argv))
   .option("group", {
     alias: "g",
     type: "string",
-    description: "Token group (dot-separated path)",
+    description: "Legacy token group (dot-separated path)",
+  })
+  .option("token-type", {
+    alias: "y",
+    type: "string",
+    description: "DTCG token $type",
+  })
+  .option("category", {
+    alias: "c",
+    type: "string",
+    description: "Legacy category field",
   })
   .option("description", {
     alias: "d",
@@ -38,7 +59,11 @@ const argv = await yargs(hideBin(process.argv))
 
 const tokenData: TokenData = {
   action: "create",
-  category: argv.category ?? "",
+  category: argv.category,
+  hierarchyLevel: argv["hierarchy-level"],
+  domain: argv.domain,
+  theme: argv.theme,
+  tokenType: argv["token-type"],
   name: argv.name,
   group: argv.group,
   value: argv.value,

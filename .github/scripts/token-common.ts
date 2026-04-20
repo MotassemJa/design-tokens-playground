@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { TokenValidator } from "./token-validator.ts";
 
@@ -14,7 +14,11 @@ export interface TokenObject {
 
 export interface TokenData {
   action: "create" | "update" | "delete";
-  category: string;
+  category?: string;
+  hierarchyLevel?: string;
+  domain?: string;
+  theme?: string;
+  tokenType?: string;
   name?: string;
   group?: string;
   tokenPath?: string;
@@ -23,6 +27,133 @@ export interface TokenData {
 }
 
 const TOKENS_DIR = join(process.cwd(), "tokens");
+
+const DOMAIN_FILENAME_MAP: Record<string, string> = {
+  color: "colors",
+  typography: "typography",
+  spacing: "spacing",
+  size: "size",
+  duration: "duration",
+  border: "border",
+  shadow: "shadow",
+  button: "button",
+  card: "card",
+  input: "input",
+  other: "other",
+};
+
+function normalizeHierarchyLevel(level?: string): "universal" | "system" | "semantic" | "component" | "legacy" {
+  if (!level) return "legacy";
+  const value = level.toLowerCase();
+  if (value.includes("universal")) return "universal";
+  if (value.includes("system")) return "system";
+  if (value.includes("semantic")) return "semantic";
+  if (value.includes("component")) return "component";
+  return "legacy";
+}
+
+function sanitizeSegment(value: string): string {
+  return value.trim().toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9._-]/g, "");
+}
+
+function toFilenameDomain(domain?: string): string {
+  const normalized = sanitizeSegment(domain ?? "other");
+  return DOMAIN_FILENAME_MAP[normalized] ?? normalized;
+}
+
+function getTokenFilePathForHierarchy(data: TokenData): string {
+  const level = normalizeHierarchyLevel(data.hierarchyLevel);
+
+  // Legacy behavior for older issue templates/scripts.
+  if (level === "legacy") {
+    return getTokenFilePath(data.category ?? "other");
+  }
+
+  const domain = toFilenameDomain(data.domain);
+  const layerDir = join(TOKENS_DIR, level);
+
+  if (!existsSync(layerDir)) {
+    mkdirSync(layerDir, { recursive: true });
+  }
+
+  switch (level) {
+    case "universal":
+      return join(layerDir, `base.${domain}.tokens.json`);
+    case "system":
+      return join(layerDir, `theme.${domain}.tokens.json`);
+    case "semantic":
+      return join(layerDir, `${domain}.tokens.json`);
+    case "component":
+      return join(layerDir, "base.tokens.json");
+    default:
+      return getTokenFilePath(data.category ?? "other");
+  }
+}
+
+function listTokenFiles(dirPath: string): string[] {
+  if (!existsSync(dirPath)) {
+    return [];
+  }
+
+  const entries = readdirSync(dirPath);
+  const files: string[] = [];
+
+  for (const entry of entries) {
+    const fullPath = join(dirPath, entry);
+    const stats = statSync(fullPath);
+    if (stats.isDirectory()) {
+      files.push(...listTokenFiles(fullPath));
+      continue;
+    }
+    if (entry.endsWith(".tokens.json")) {
+      files.push(fullPath);
+    }
+  }
+
+  return files;
+}
+
+function findTokenFileByPath(tokenPath: string): string | undefined {
+  const tokenFiles = listTokenFiles(TOKENS_DIR);
+  for (const filePath of tokenFiles) {
+    const tokens = readTokenFile(filePath);
+    if (getNestedValue(tokens, tokenPath)) {
+      return filePath;
+    }
+  }
+  return undefined;
+}
+
+function buildHierarchicalTokenPath(data: TokenData): string {
+  if (!data.name) {
+    return "";
+  }
+
+  const level = normalizeHierarchyLevel(data.hierarchyLevel);
+  const name = sanitizeSegment(data.name);
+  const domain = sanitizeSegment(data.domain ?? "");
+  const theme = sanitizeSegment(data.theme ?? "");
+
+  // Legacy path builder support for old templates.
+  if (level === "legacy") {
+    return buildTokenPath(name, data.group);
+  }
+
+  if (level === "universal") {
+    return `universal.${domain}.${name}`;
+  }
+
+  if (level === "system") {
+    const themePart = theme && theme !== "universal" ? `${theme}.` : "";
+    return `system.${themePart}${domain}.${name}`;
+  }
+
+  if (level === "semantic") {
+    return `semantic.${domain}.${name}`;
+  }
+
+  return `component.${name}`;
+}
 
 export function parseTokenValue(value: string): TokenValue {
   try {
@@ -146,7 +277,7 @@ export function buildTokenPath(tokenName: string, tokenGroup?: string): string {
 }
 
 export function createToken(data: TokenData): void {
-  const filePath = getTokenFilePath(data.category);
+  const filePath = getTokenFilePathForHierarchy(data);
   const tokens = readTokenFile(filePath);
 
   if (!data.name) {
@@ -154,14 +285,16 @@ export function createToken(data: TokenData): void {
     process.exit(1);
   }
 
-  const tokenPath = buildTokenPath(data.name, data.group);
+  const tokenPath = buildHierarchicalTokenPath(data);
   const tokenValue = parseTokenValue(data.value ?? "");
 
   if (data.description) {
     tokenValue.$description = data.description;
   }
 
-  if (data.category) {
+  if (data.tokenType) {
+    tokenValue.$type = data.tokenType;
+  } else if (data.category) {
     tokenValue.$type = data.category;
   }
 
@@ -192,15 +325,14 @@ export function createToken(data: TokenData): void {
 }
 
 export function updateToken(data: TokenData): void {
-  const filePath = getTokenFilePath(data.category);
-  const tokens = readTokenFile(filePath);
-
   if (!data.tokenPath) {
     console.error("Token path (--token-path) is required for update action");
     process.exit(1);
   }
 
   const tokenPath = data.tokenPath;
+  const filePath = findTokenFileByPath(tokenPath) ?? getTokenFilePathForHierarchy(data);
+  const tokens = readTokenFile(filePath);
   const existing = getNestedValue(tokens, tokenPath);
 
   if (!existing) {
@@ -214,6 +346,12 @@ export function updateToken(data: TokenData): void {
     tokenValue.$description = (existing as TokenValue).$description;
   } else if (data.description) {
     tokenValue.$description = data.description;
+  }
+
+  if (typeof existing === "object" && "$type" in existing && !data.tokenType) {
+    tokenValue.$type = (existing as TokenValue).$type;
+  } else if (data.tokenType) {
+    tokenValue.$type = data.tokenType;
   }
 
   setNestedValue(tokens, tokenPath, tokenValue);
@@ -237,15 +375,14 @@ export function updateToken(data: TokenData): void {
 }
 
 export function deleteToken(data: TokenData): void {
-  const filePath = getTokenFilePath(data.category);
-  const tokens = readTokenFile(filePath);
-
   if (!data.tokenPath) {
     console.error("Token path (--token-path) is required for delete action");
     process.exit(1);
   }
 
   const tokenPath = data.tokenPath;
+  const filePath = findTokenFileByPath(tokenPath) ?? getTokenFilePathForHierarchy(data);
+  const tokens = readTokenFile(filePath);
 
   if (!getNestedValue(tokens, tokenPath)) {
     console.log(`Token not found at path: ${tokenPath}`);
