@@ -1,0 +1,51 @@
+{
+  "system": {
+    "spacing": {
+      "component": {
+        "button": {
+          "padding-horizontal": {
+            "$value": "{universal.spacing.16}",
+            "$type": "dimension",
+            "$description": "System spacing for button horizontal padding"
+          },
+          "padding-vertical": {
+            "$value": "{universal.spacing.8}",
+            "$type": "dimension",
+            "$description": "System spacing for button vertical padding"
+          }
+        },
+        "input": {
+          "padding-horizontal": {
+            "$value": "{universal.spacing.12}",
+            "$type": "dimension",
+            "$description": "System spacing for input horizontal padding"
+          },
+          "padding-vertical": {
+            "$value": "{universal.spacing.8}",
+            "$type": "dimension",
+            "$description": "System spacing for input vertical padding"
+          }
+        },
+        "card": {
+          "padding": {
+            "$value": "{universal.spacing.24}",
+            "$type": "dimension",
+            "$description": "System spacing for card padding"
+          }
+        }
+      },
+      "layout": {
+        "gap": {
+          "$value": "{universal.spacing.16}",
+          "$type": "dimension",
+          "$description": "System spacing for layout gap between elements"
+        },
+        "margin": {
+          "$value": "{universal.spacing.24}",
+          "$type": "dimension",
+          "$description": "System spacing for layout margin"
+        }
+      }
+    }
+  }
+}

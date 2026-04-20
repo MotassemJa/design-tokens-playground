@@ -1,0 +1,51 @@
+{
+  "universal": {
+    "color": {
+      "red": {
+        "$value": "#EF4444",
+        "$type": "color",
+        "$description": "Universal red - primitive red color value"
+      },
+      "orange": {
+        "$value": "#F97316",
+        "$type": "color",
+        "$description": "Universal orange - primitive orange color value"
+      },
+      "yellow": {
+        "$value": "#EAB308",
+        "$type": "color",
+        "$description": "Universal yellow - primitive yellow color value"
+      },
+      "green": {
+        "$value": "#22C55E",
+        "$type": "color",
+        "$description": "Universal green - primitive green color value"
+      },
+      "blue": {
+        "$value": "#3B82F6",
+        "$type": "color",
+        "$description": "Universal blue - primitive blue color value"
+      },
+      "purple": {
+        "$value": "#A855F7",
+        "$type": "color",
+        "$description": "Universal purple - primitive purple color value"
+      },
+      "gray": {
+        "$value": "#6B7280",
+        "$type": "color",
+        "$description": "Universal gray - primitive gray color value"
+      },
+      "black": {
+        "$value": "#000000",
+        "$type": "color",
+        "$description": "Universal black - primitive black color value"
+      },
+      "white": {
+        "$value": "#FFFFFF",
+        "$type": "color",
+        "$description": "Universal white - primitive white color value"
+      }
+    }
+  }
+}

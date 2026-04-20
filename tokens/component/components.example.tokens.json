@@ -1,0 +1,155 @@
+{
+  "component": {
+    "button": {
+      "primary": {
+        "background": {
+          "$value": "{semantic.color.action.primary}",
+          "$type": "color",
+          "$description": "Background color for primary buttons - inherits from semantic action primary"
+        },
+        "text": {
+          "$value": "{semantic.color.text.primary}",
+          "$type": "color",
+          "$description": "Text color for primary buttons"
+        },
+        "padding": {
+          "$value": "{semantic.spacing.component.button.padding}",
+          "$type": "dimension",
+          "$description": "Padding for primary buttons - inherits from semantic button padding"
+        },
+        "border-radius": {
+          "$value": "0.375rem",
+          "$type": "borderRadius",
+          "$description": "Border radius for primary buttons"
+        }
+      },
+      "secondary": {
+        "background": {
+          "$value": "{semantic.color.action.secondary}",
+          "$type": "color",
+          "$description": "Background color for secondary buttons - inherits from semantic action secondary"
+        },
+        "text": {
+          "$value": "{semantic.color.text.primary}",
+          "$type": "color",
+          "$description": "Text color for secondary buttons"
+        },
+        "padding": {
+          "$value": "{semantic.spacing.component.button.padding}",
+          "$type": "dimension",
+          "$description": "Padding for secondary buttons"
+        },
+        "border-radius": {
+          "$value": "0.375rem",
+          "$type": "borderRadius",
+          "$description": "Border radius for secondary buttons"
+        }
+      },
+      "success": {
+        "background": {
+          "$value": "{semantic.color.feedback.success}",
+          "$type": "color",
+          "$description": "Background color for success buttons"
+        },
+        "text": {
+          "$value": "{semantic.color.text.primary}",
+          "$type": "color",
+          "$description": "Text color for success buttons"
+        },
+        "padding": {
+          "$value": "{semantic.spacing.component.button.padding}",
+          "$type": "dimension",
+          "$description": "Padding for success buttons"
+        },
+        "border-radius": {
+          "$value": "0.375rem",
+          "$type": "borderRadius",
+          "$description": "Border radius for success buttons"
+        }
+      },
+      "error": {
+        "background": {
+          "$value": "{semantic.color.feedback.error}",
+          "$type": "color",
+          "$description": "Background color for error/destructive buttons"
+        },
+        "text": {
+          "$value": "{semantic.color.text.primary}",
+          "$type": "color",
+          "$description": "Text color for error buttons"
+        },
+        "padding": {
+          "$value": "{semantic.spacing.component.button.padding}",
+          "$type": "dimension",
+          "$description": "Padding for error buttons"
+        },
+        "border-radius": {
+          "$value": "0.375rem",
+          "$type": "borderRadius",
+          "$description": "Border radius for error buttons"
+        }
+      }
+    },
+    "card": {
+      "background": {
+        "$value": "{semantic.color.background.default}",
+        "$type": "color",
+        "$description": "Background color for cards - inherits from semantic background default"
+      },
+      "padding": {
+        "$value": "{semantic.spacing.component.card.padding}",
+        "$type": "dimension",
+        "$description": "Padding for cards - inherits from semantic card padding"
+      },
+      "border-radius": {
+        "$value": "0.5rem",
+        "$type": "borderRadius",
+        "$description": "Border radius for cards"
+      },
+      "shadow": {
+        "$value": "0 4px 6px rgba(0, 0, 0, 0.1)",
+        "$type": "shadow",
+        "$description": "Shadow for cards"
+      }
+    },
+    "input": {
+      "background": {
+        "$value": "{semantic.color.background.default}",
+        "$type": "color",
+        "$description": "Background color for input fields - inherits from semantic background"
+      },
+      "text": {
+        "$value": "{semantic.color.text.primary}",
+        "$type": "color",
+        "$description": "Text color for input fields - inherits from semantic text primary"
+      },
+      "border": {
+        "$value": "1px solid #D1D5DB",
+        "$type": "border",
+        "$description": "Border for input fields"
+      },
+      "border-radius": {
+        "$value": "0.375rem",
+        "$type": "borderRadius",
+        "$description": "Border radius for input fields"
+      },
+      "padding": {
+        "$value": "{semantic.spacing.component.input.padding}",
+        "$type": "dimension",
+        "$description": "Padding for input fields - inherits from semantic input padding"
+      }
+    },
+    "input-focus": {
+      "border": {
+        "$value": "2px solid {semantic.color.action.primary}",
+        "$type": "border",
+        "$description": "Border for input fields in focus state"
+      },
+      "outline": {
+        "$value": "none",
+        "$type": "border",
+        "$description": "Outline for input fields in focus state"
+      }
+    }
+  }
+}

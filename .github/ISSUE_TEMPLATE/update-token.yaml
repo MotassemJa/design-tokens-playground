@@ -1,4 +1,96 @@
 name: ✏️ Update Existing Token
+description: Request changes to an existing design token while maintaining hierarchy rules
+title: "[UPDATE] "
+labels: ["token-request", "update"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Update an Existing Design Token
+        
+        Specify which token you want to update and the changes needed. The hierarchy layer will help verify that any reference changes maintain proper inheritance rules (universal → system → semantic → component).
+        
+        See [Token Hierarchy Documentation](../../README.md#token-hierarchy--inheritance-rules) for details on inheritance rules.
+
+  - type: dropdown
+    id: hierarchy-level
+    attributes:
+      label: Hierarchy Level
+      description: Which layer contains the token being updated?
+      options:
+        - Universal (Layer 1 - Primitives)
+        - System (Layer 2 - Theme-aware)
+        - Semantic (Layer 3 - Intent-driven)
+        - Component (Layer 4 - UI Styles)
+    validations:
+      required: true
+
+  - type: input
+    id: token-path
+    attributes:
+      label: Token Path
+      description: |
+        The full path to the token using dot notation.
+        Examples:
+        - Universal: `universal.color.blue`
+        - System: `system.light.color.brand.primary`
+        - Semantic: `semantic.color.action.primary`
+        - Component: `component.button.primary.background`
+      placeholder: "semantic.color.action.primary"
+    validations:
+      required: true
+
+  - type: textarea
+    id: current-value
+    attributes:
+      label: Current Value
+      description: What is the current value? (helps verify we're updating the right token)
+      placeholder: "#3B82F6 or {system.light.color.brand.primary}"
+    validations:
+      required: true
+
+  - type: textarea
+    id: new-value
+    attributes:
+      label: New Value
+      description: What should the new value be?
+      placeholder: "#2563EB or {system.light.color.brand.secondary}"
+    validations:
+      required: true
+
+  - type: textarea
+    id: reason
+    attributes:
+      label: Reason for Change
+      description: Why does this token need to be updated?
+      placeholder: "Accessibility audit found insufficient contrast ratio..."
+    validations:
+      required: true
+
+  - type: dropdown
+    id: breaking-change
+    attributes:
+      label: Is this a breaking change?
+      description: Will this change significantly affect existing designs?
+      options:
+        - "No - Minor adjustment"
+        - "Yes - Significant visual change"
+        - "Unsure - Needs review"
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: confirmation
+    attributes:
+      label: Pre-update Checklist
+      options:
+        - label: I understand this change may affect tokens in higher layers that reference this token
+          required: true
+        - label: "(For non-universal): I am only referencing tokens from the layer directly above mine"
+          required: true
+        - label: I have verified there are no circular reference issues
+          required: true
+name: ✏️ Update Existing Token
 description: Request changes to an existing design token
 title: "[UPDATE] "
 labels: ["token-request", "update"]

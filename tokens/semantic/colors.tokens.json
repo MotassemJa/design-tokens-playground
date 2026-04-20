@@ -3,48 +3,58 @@
     "color": {
       "interactive": {
         "primary": {
-          "$value": "{color.bright-cyan}",
+          "$value": "{system.light.color.brand.primary}",
           "$type": "color",
-          "$description": "Primary interactive element color for CTAs, links, and key interactions"
+          "$description": "Primary interactive element color for CTAs, links, and key interactions - references system light theme"
+        },
+        "primaryText": {
+          "$value": "#FFFFFF",
+          "$type": "color",
+          "$description": "Primary interactive element text color"
         },
         "secondary": {
-          "$value": "{color.warm-pink}",
+          "$value": "{system.light.color.brand.secondary}",
           "$type": "color",
-          "$description": "Secondary interactive element color for less prominent interactions"
+          "$description": "Secondary interactive element color for less prominent interactions - references system light theme"
+        },
+        "secondaryText": {
+          "$value": "#FFFFFF",
+          "$type": "color",
+          "$description": "Secondary interactive element text color"
         }
       },
       "feedback": {
         "success": {
-          "$value": "#10b981",
+          "$value": "{system.light.color.feedback.success}",
           "$type": "color",
-          "$description": "Color indicating successful state or positive feedback"
+          "$description": "Color indicating successful state or positive feedback - references system light theme"
         },
         "error": {
-          "$value": "#ef4444",
+          "$value": "{system.light.color.feedback.error}",
           "$type": "color",
-          "$description": "Color indicating error state or negative feedback"
+          "$description": "Color indicating error state or negative feedback - references system light theme"
         },
         "warning": {
-          "$value": "#f59e0b",
+          "$value": "{system.light.color.feedback.warning}",
           "$type": "color",
-          "$description": "Color indicating warning state or caution"
+          "$description": "Color indicating warning state or caution - references system light theme"
         },
         "info": {
-          "$value": "#3b82f6",
+          "$value": "{system.light.color.feedback.success}",
           "$type": "color",
-          "$description": "Color indicating informational state or neutral message"
+          "$description": "Color indicating informational state or neutral message - references system light theme"
         }
       },
       "background": {
         "default": {
-          "$value": "#ffffff",
+          "$value": "{system.light.color.background.default}",
           "$type": "color",
-          "$description": "Default background color for main content areas"
+          "$description": "Default background color for main content areas - references system light theme"
         },
         "secondary": {
-          "$value": "#f3f4f6",
+          "$value": "{system.light.color.background.secondary}",
           "$type": "color",
-          "$description": "Secondary background color for alternate sections"
+          "$description": "Secondary background color for alternate sections - references system light theme"
         },
         "tertiary": {
           "$value": "#e5e7eb",
@@ -54,14 +64,14 @@
       },
       "text": {
         "primary": {
-          "$value": "#1f2937",
+          "$value": "{system.light.color.text.primary}",
           "$type": "color",
-          "$description": "Primary text color for main content"
+          "$description": "Primary text color for main content - references system light theme"
         },
         "secondary": {
-          "$value": "#6b7280",
+          "$value": "{system.light.color.text.secondary}",
           "$type": "color",
-          "$description": "Secondary text color for supporting information"
+          "$description": "Secondary text color for supporting information - references system light theme"
         },
         "disabled": {
           "$value": "#d1d5db",

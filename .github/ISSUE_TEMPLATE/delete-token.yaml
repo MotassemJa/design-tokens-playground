@@ -1,4 +1,96 @@
 name: 🗑️ Delete Token
+description: Request removal of a design token from the 4-layer hierarchy
+title: "[DELETE] "
+labels: ["token-request", "delete"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Delete a Design Token
+        
+        ⚠️ **Warning**: Deleting tokens may break existing implementations and any tokens in higher layers that reference them. Please ensure you have:
+        1. Verified there are no dependent tokens in higher layers
+        2. Notified consuming teams of this change
+        3. Provided a migration path (replacement token if applicable)
+        
+        See [Token Hierarchy Documentation](../../README.md#token-hierarchy--inheritance-rules) for details.
+
+  - type: dropdown
+    id: hierarchy-level
+    attributes:
+      label: Hierarchy Level
+      description: Which layer contains the token being deleted?
+      options:
+        - Universal (Layer 1 - Primitives)
+        - System (Layer 2 - Theme-aware)
+        - Semantic (Layer 3 - Intent-driven)
+        - Component (Layer 4 - UI Styles)
+    validations:
+      required: true
+
+  - type: input
+    id: token-path
+    attributes:
+      label: Token Path
+      description: |
+        The full path to the token using dot notation.
+        Examples:
+        - Universal: `universal.color.deprecated-blue`
+        - System: `system.light.color.brand.old-primary`
+        - Semantic: `semantic.color.old-action.primary`
+        - Component: `component.legacy-button.primary.background`
+      placeholder: "semantic.color.deprecated.old-primary"
+    validations:
+      required: true
+
+  - type: textarea
+    id: reason
+    attributes:
+      label: Reason for Deletion
+      description: Why should this token be removed?
+      placeholder: "Token is obsolete and has been consolidated into a new design system v2"
+    validations:
+      required: true
+
+  - type: textarea
+    id: impact-analysis
+    attributes:
+      label: Impact Analysis
+      description: What tokens or components depend on this token? Are there any higher-layer tokens that reference it?
+      placeholder: |
+        - Dependent tokens: semantic.color.action.primary references this token
+        - Affected components: component.button.primary, component.link
+      validations:
+        required: true
+
+  - type: input
+    id: replacement
+    attributes:
+      label: Replacement Token (if any)
+      description: What token should be used instead? Must be in the same or lower layer hierarchy.
+      placeholder: "semantic.color.action.primary"
+
+  - type: textarea
+    id: migration-guide
+    attributes:
+      label: Migration Guide
+      description: Instructions for teams to migrate away from this token
+      placeholder: |
+        Replace all uses of `semantic.color.deprecated.old-primary` with `semantic.color.action.primary`.
+        The visual appearance is identical.
+
+  - type: checkboxes
+    id: confirmation
+    attributes:
+      label: Confirmation
+      options:
+        - label: I understand this is a breaking change
+          required: true
+        - label: I have verified no tokens in higher layers depend on this token
+          required: true
+        - label: I have notified consuming teams and provided a migration path
+          required: true
+name: 🗑️ Delete Token
 description: Request removal of a design token
 title: "[DELETE] "
 labels: ["token-request", "delete"]

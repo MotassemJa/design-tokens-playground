@@ -1,16 +1,4 @@
-# Design Tokens Playground
-
-A comprehensive design tokens system built with Style Dictionary, featuring best-effort TokenScript processing, automated GitHub workflows, and a web-based preview tool.
-
-## Features
-
-### 🎨 Token Management
-- **GitHub Issue Integration**: Create, update, and delete tokens via GitHub Issues with automatic PR generation
-- **Schema Validation**: Runtime DTCG-style validation in the build pipeline
-- **Token References**: Automatic resolution of token references using `{path.to.token}` syntax
-- **Type Safety**: Structured token values with proper TypeScript definitions
-
-### 🚀 Advanced Processing
+## 📊 Token Hierarchy & Inheritance Rules
 - **TokenScript Integration**: Best-effort interpretation for resolvable expressions
 - **Safe Fallback Behavior**: Unsupported TokenScript expressions are reported as warnings and keep original token values
 - **CSS Function Preservation**: CSS functions like `clamp()` and `rgba()` are preserved as literal values when not interpreted
@@ -68,10 +56,6 @@ console.log(tokens.color.primary.bright_cyan.$value);
 
 ## TokenScript Examples
 
-TokenScript enables advanced token computations when expressions are supported by the interpreter:
-
-```json
-{
   "spacing": {
     "fluid": {
       "$value": "clamp(1rem, 2vw, 2rem)",
@@ -95,6 +79,33 @@ TokenScript enables advanced token computations when expressions are supported b
 │   ├── spacing/base.tokens.json     # Spacing tokens
 │   ├── semantic/colors.tokens.json  # Semantic color tokens
 │   └── component/base.tokens.json   # Component tokens
+│
+```
+
+becomes:
+
+```
+├── tokens/                                      # 4-layer token hierarchy
+│
+│   ├── universal/                              # LAYER 1: Primitives
+│   │   ├── base.colors.tokens.json            # Universal colors
+│   │   ├── base.spacing.tokens.json           # Universal spacing
+│   │   ├── base.typography.tokens.json        # Universal typography
+│   │   └── README.md                          # Universal layer guide
+│   │
+│   ├── system/                                # LAYER 2: Theme-aware
+│   │   ├── theme.colors.tokens.json          # System colors (light/dark)
+│   │   ├── theme.spacing.tokens.json         # System spacing
+│   │   └── README.md                         # System layer guide
+│   │
+│   ├── semantic/                             # LAYER 3: Intent-driven
+│   │   ├── colors.example.tokens.json       # Semantic colors
+│   │   ├── spacing.example.tokens.json      # Semantic spacing
+│   │   └── README.md                        # Semantic layer guide
+│   │
+│   └── component/                           # LAYER 4: Composed UI
+│       ├── components.example.tokens.json  # Component tokens
+│       └── README.md                       # Component layer guide
 │
 ├── src/
 │   ├── index.ts                     # CLI entrypoint
@@ -173,9 +184,11 @@ After a successful build, access the live preview at:
 ```bash
 # Build with custom prefix
 npm run build -- --prefix myapp
-
-# Build specific outputs only
-npm run build -- --no-types --no-json
+### 📊 4-Layer Token Hierarchy
+**Layer 1 - Universal**: Primitive values (self-contained, no references)
+**Layer 2 - System**: Theme-aware tokens (references universal)
+**Layer 3 - Semantic**: Intent-based naming (references system)
+**Layer 4 - Component**: Composed UI styles (references semantic)
 
 # Custom output directory
 npm run build -- --output-dir build
@@ -216,10 +229,6 @@ All tokens follow the DTCG Design Tokens Format Module:
 Edit JSON files in the `tokens/` directory following the DTCG format.
 
 ### Validation
-Tokens are validated in the runtime build pipeline and token-management scripts:
-- Required `$value` and `$type` properties
-- Type-specific value format validation
-- Reference resolution
 - Schema compliance
 
 Current compatibility note:
@@ -297,8 +306,4 @@ ls -la dist/css/
 2. **Code Changes**: Submit PRs with proper testing
 3. **Documentation**: Update README for new features
 
-## Resources
-
-- [DTCG Design Tokens Format Module](https://tr.w3.org/design-tokens/)
-- [Style Dictionary Documentation](https://styledictionary.com/)
 - [TokenScript Documentation](https://github.com/tokens-studio/tokenscript-interpreter)

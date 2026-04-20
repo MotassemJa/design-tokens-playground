@@ -1,0 +1,118 @@
+{
+  "system": {
+    "light": {
+      "color": {
+        "brand": {
+          "primary": {
+            "$value": "{universal.color.blue}",
+            "$type": "color",
+            "$description": "System light theme brand primary - references universal blue"
+          },
+          "secondary": {
+            "$value": "{universal.color.purple}",
+            "$type": "color",
+            "$description": "System light theme brand secondary - references universal purple"
+          }
+        },
+        "feedback": {
+          "success": {
+            "$value": "{universal.color.green}",
+            "$type": "color",
+            "$description": "System light theme feedback success - references universal green"
+          },
+          "error": {
+            "$value": "{universal.color.red}",
+            "$type": "color",
+            "$description": "System light theme feedback error - references universal red"
+          },
+          "warning": {
+            "$value": "{universal.color.orange}",
+            "$type": "color",
+            "$description": "System light theme feedback warning - references universal orange"
+          }
+        },
+        "background": {
+          "default": {
+            "$value": "{universal.color.white}",
+            "$type": "color",
+            "$description": "System light theme background default"
+          },
+          "secondary": {
+            "$value": "#F3F4F6",
+            "$type": "color",
+            "$description": "System light theme background secondary"
+          }
+        },
+        "text": {
+          "primary": {
+            "$value": "{universal.color.black}",
+            "$type": "color",
+            "$description": "System light theme text primary"
+          },
+          "secondary": {
+            "$value": "{universal.color.gray}",
+            "$type": "color",
+            "$description": "System light theme text secondary"
+          }
+        }
+      }
+    },
+    "dark": {
+      "color": {
+        "brand": {
+          "primary": {
+            "$value": "#60A5FA",
+            "$type": "color",
+            "$description": "System dark theme brand primary (lighter blue for contrast)"
+          },
+          "secondary": {
+            "$value": "#C084FC",
+            "$type": "color",
+            "$description": "System dark theme brand secondary (lighter purple for contrast)"
+          }
+        },
+        "feedback": {
+          "success": {
+            "$value": "#4ADE80",
+            "$type": "color",
+            "$description": "System dark theme feedback success (lighter green for contrast)"
+          },
+          "error": {
+            "$value": "#F87171",
+            "$type": "color",
+            "$description": "System dark theme feedback error (lighter red for contrast)"
+          },
+          "warning": {
+            "$value": "#FBBF24",
+            "$type": "color",
+            "$description": "System dark theme feedback warning (lighter orange for contrast)"
+          }
+        },
+        "background": {
+          "default": {
+            "$value": "#1F2937",
+            "$type": "color",
+            "$description": "System dark theme background default"
+          },
+          "secondary": {
+            "$value": "#111827",
+            "$type": "color",
+            "$description": "System dark theme background secondary"
+          }
+        },
+        "text": {
+          "primary": {
+            "$value": "{universal.color.white}",
+            "$type": "color",
+            "$description": "System dark theme text primary"
+          },
+          "secondary": {
+            "$value": "#D1D5DB",
+            "$type": "color",
+            "$description": "System dark theme text secondary"
+          }
+        }
+      }
+    }
+  }
+}

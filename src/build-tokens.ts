@@ -144,6 +144,14 @@ export async function buildTokens(options: BuildOptions = {}) {
     throw new Error(`Token validation failed:\n${errors}`);
   }
 
+  // Validate cross-layer hierarchy
+  validator.validateHierarchy(allTokens as TokenGroup);
+  const hierarchyErrors = validator.getErrors();
+  if (hierarchyErrors.length > 0) {
+    const errors = hierarchyErrors.map((error) => `- ${error}`).join("\n");
+    throw new Error(`Token hierarchy validation failed:\n${errors}`);
+  }
+
   const warnings = validator.getWarnings();
   if (warnings.length > 0) {
     console.warn("⚠️  Token validation warnings:");

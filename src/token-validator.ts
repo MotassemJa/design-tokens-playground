@@ -84,6 +84,82 @@ export class TokenValidator {
     return this.errors.length === 0;
   }
 
+  /**
+   * Validates hierarchy and cross-layer references according to the 4-layer structure:
+   * universal → system → semantic → component
+   * Each layer can only reference the layer immediately above it.
+   */
+  validateHierarchy(tokens: TokenGroup): void {
+    this.validateCrossLayerReferences(tokens, "");
+  }
+
+  private validateCrossLayerReferences(group: TokenGroup, basePath: string = ""): void {
+    for (const [key, value] of Object.entries(group)) {
+      const currentPath = basePath ? `${basePath}.${key}` : key;
+
+      if (this.isDesignToken(value)) {
+        const token = value as DesignTokenValue;
+        const tokenValue = String(token.$value);
+
+        // Extract layer from token path
+        const tokenLayer = this.extractLayer(currentPath);
+
+        // Validate all references within this token
+        const references = this.extractReferences(tokenValue);
+        for (const ref of references) {
+          this.validateReference(ref, currentPath, tokenLayer);
+        }
+      } else if (typeof value === "object" && value !== null) {
+        this.validateCrossLayerReferences(value as TokenGroup, currentPath);
+      }
+    }
+  }
+
+  private extractLayer(tokenPath: string): string | null {
+    const match = tokenPath.match(/^(universal|system|semantic|component)/);
+    return match ? match[1] : null;
+  }
+
+  private extractReferences(value: string): string[] {
+    const references: string[] = [];
+    const regex = /\{([a-zA-Z0-9._-]+)\}/g;
+    let match;
+
+    while ((match = regex.exec(value)) !== null) {
+      references.push(match[1]);
+    }
+
+    return references;
+  }
+
+  private validateReference(refPath: string, tokenPath: string, tokenLayer: string | null): void {
+    if (!tokenLayer) return; // Skip if token path doesn't match 4-layer structure
+
+    const refLayer = this.extractLayer(refPath);
+
+    if (!refLayer) {
+      this.warnings.push(
+        `Token at path '${tokenPath}' references '${refPath}' which is not part of the 4-layer hierarchy (universal/system/semantic/component)`
+      );
+      return;
+    }
+
+    const validReferences: Record<string, string[]> = {
+      universal: [], // Universal tokens cannot reference any layer
+      system: ["universal"], // System can only reference universal
+      semantic: ["system"], // Semantic can only reference system
+      component: ["semantic"], // Component can only reference semantic
+    };
+
+    const allowed = validReferences[tokenLayer];
+
+    if (!allowed.includes(refLayer)) {
+      this.errors.push(
+        `Hierarchy violation: ${tokenLayer} token '${tokenPath}' cannot reference ${refLayer} token '${refPath}'. ${tokenLayer} tokens can only reference: ${allowed.length > 0 ? allowed.join(", ") : "no other layers (self-contained)"}`
+      );
+    }
+  }
+
   private validateTokenGroup(group: TokenGroup, basePath: string = ""): void {
     for (const [key, value] of Object.entries(group)) {
       const currentPath = basePath ? `${basePath}.${key}` : key;

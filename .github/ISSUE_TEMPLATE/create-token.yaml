@@ -1,5 +1,5 @@
 name: 🎨 Create New Token
-description: Request a new design token to be added to the system
+description: Request a new design token in the 4-layer hierarchy (universal → system → semantic → component)
 title: "[CREATE] "
 labels: ["token-request", "create"]
 body:
@@ -7,32 +7,73 @@ body:
     attributes:
       value: |
         ## Create a New Design Token
-        Fill out the form below to request a new token. A pull request will be automatically created for review.
+        
+        Design tokens are organized in a 4-layer hierarchy. Choose the appropriate layer for your token:
+        
+        **LAYER 1 - Universal**: Primitive values (colors, spacing, typography) - self-contained, no references
+        **LAYER 2 - System**: Theme-aware tokens (light/dark) - references universal only
+        **LAYER 3 - Semantic**: Intent-driven tokens (action, feedback) - references system only
+        **LAYER 4 - Component**: UI component styles - references semantic only
+        
+        See [Token Hierarchy Documentation](../../README.md#4-layer-token-hierarchy) for details.
 
   - type: dropdown
-    id: category
+    id: hierarchy-level
     attributes:
-      label: Token Category
-      description: What type of token is this?
+      label: Hierarchy Level
+      description: Which layer should this token belong to?
       options:
-        - color
-        - typography
-        - spacing
-        - shadow
-        - border
-        - animation
-        - breakpoint
+        - Universal (Layer 1 - Primitives)
+        - System (Layer 2 - Theme-aware)
+        - Semantic (Layer 3 - Intent-driven)
+        - Component (Layer 4 - UI Styles)
     validations:
       required: true
+
+  - type: dropdown
+    id: domain
+    attributes:
+      label: Domain/Category
+      description: What aspect of design does this token address?
+      options:
+        - color
+        - spacing
+        - typography
+        - size
+        - duration
+        - border
+        - shadow
+        - button (Component only)
+        - card (Component only)
+        - input (Component only)
+        - other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: theme
+    attributes:
+      label: Theme (System Level Only)
+      description: "**System layer tokens only**: Which theme does this token apply to?"
+      options:
+        - light
+        - dark
+        - high-contrast
+        - universal (no specific theme)
+    validations:
+      required: false
 
   - type: input
     id: token-name
     attributes:
       label: Token Name
       description: |
-        Use kebab-case (e.g., primary-blue, heading-large, spacing-md).
-        This will be the key used to reference the token.
-      placeholder: "e.g., primary-blue-500"
+        Use kebab-case or dot notation following the naming pattern for your layer:
+        - Universal: `property` (e.g., `blue`, `16`)
+        - System: `concept.property` (e.g., `brand.primary`, `feedback.success`)
+        - Semantic: `intent.variant` (e.g., `action.primary`, `feedback.error`)
+        - Component: `component.variant.property` (e.g., `button.primary.background`)
+      placeholder: "e.g., primary-blue or primary"
     validations:
       required: true
 
@@ -41,30 +82,32 @@ body:
     attributes:
       label: Token Value
       description: |
-        The value for this token. Examples:
-        - Color: #3B82F6 or rgb(59, 130, 246)
-        - Spacing: 16px or 1rem
-        - Typography: { "fontSize": "18px", "fontWeight": "600", "lineHeight": "1.5" }
-        - Shadow: 0 4px 6px rgba(0, 0, 0, 0.1)
-      placeholder: "#3B82F6"
+        The value for this token. For references, use `{path.to.token}` syntax.
+        
+        Examples:
+        - Primitive color: `#3B82F6`
+        - System reference: `{universal.color.blue}`
+        - Semantic reference: `{system.light.color.brand.primary}`
+        - Component reference: `{semantic.color.action.primary}`
+      placeholder: "#3B82F6 or {universal.color.blue}"
     validations:
       required: true
 
   - type: input
-    id: token-group
+    id: token-type
     attributes:
-      label: Token Group (Optional)
-      description: |
-        Nest this token under a group. Use dot notation for nested groups.
-        Leave empty for root-level tokens.
-      placeholder: "e.g., brand.primary or feedback.success"
+      label: Token Type
+      description: DTCG token type (color, dimension, fontSize, fontWeight, duration, border, shadow, etc.)
+      placeholder: "color or dimension"
+    validations:
+      required: true
 
   - type: textarea
     id: description
     attributes:
       label: Description
       description: Explain the purpose and intended use of this token.
-      placeholder: "Primary brand color used for main CTAs and links"
+      placeholder: "Primary brand color used for main CTAs and interactive elements"
     validations:
       required: true
 
@@ -72,7 +115,7 @@ body:
     id: usage-examples
     attributes:
       label: Usage Examples
-      description: Where should this token be used?
+      description: Where and how should this token be used?
       placeholder: |
         - Primary buttons
         - Active navigation items
@@ -83,7 +126,11 @@ body:
     attributes:
       label: Pre-submission Checklist
       options:
-        - label: I have checked that this token does not already exist
+        - label: I have checked that this token does not already exist in its layer
           required: true
-        - label: The token name follows our naming conventions
+        - label: The token name follows the naming convention for its layer
+          required: true
+        - label: (For non-universal): I am only referencing tokens from the layer directly above mine
+          required: true
+        - label: The $type value is valid per DTCG spec
           required: true
