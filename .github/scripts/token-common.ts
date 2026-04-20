@@ -2,16 +2,25 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSy
 import { join } from "node:path";
 import { TokenValidator } from "./token-validator.ts";
 
+/**
+ * DTCG token leaf used by workflow helper scripts.
+ */
 export interface TokenValue {
   $value: string | number | object | boolean;
   $description?: string;
   $type?: string;
 }
 
+/**
+ * Recursive token object used by script-side CRUD operations.
+ */
 export interface TokenObject {
   [key: string]: TokenValue | TokenObject;
 }
 
+/**
+ * Input payload shared by create/update/delete workflow scripts.
+ */
 export interface TokenData {
   action: "create" | "update" | "delete";
   category?: string;
@@ -22,6 +31,8 @@ export interface TokenData {
   namespaceTheme?: string;
   namespaceDomain?: string;
   objectPath?: string;
+  basePath?: string;
+  modifierPath?: string;
   tokenType?: string;
   name?: string;
   group?: string;
@@ -46,6 +57,9 @@ const DOMAIN_FILENAME_MAP: Record<string, string> = {
   other: "other",
 };
 
+/**
+ * Normalizes optional hierarchy level input from issue forms or CLI flags.
+ */
 function normalizeHierarchyLevel(level?: string): "universal" | "system" | "semantic" | "component" | "legacy" {
   if (!level) return "legacy";
   const value = level.toLowerCase();
@@ -56,27 +70,45 @@ function normalizeHierarchyLevel(level?: string): "universal" | "system" | "sema
   return "legacy";
 }
 
+/**
+ * Resolves effective namespace layer from legacy and namespace-first inputs.
+ */
 function getNormalizedNamespaceLevel(data: TokenData): "universal" | "system" | "semantic" | "component" | "legacy" {
   return normalizeHierarchyLevel(data.namespaceLevel ?? data.hierarchyLevel);
 }
 
+/**
+ * Resolves and sanitizes namespace domain segment.
+ */
 function getNormalizedNamespaceDomain(data: TokenData): string {
   return sanitizeSegment(data.namespaceDomain ?? data.domain ?? "");
 }
 
+/**
+ * Resolves and sanitizes namespace theme segment.
+ */
 function getNormalizedNamespaceTheme(data: TokenData): string {
   return sanitizeSegment(data.namespaceTheme ?? data.theme ?? "");
 }
 
+/**
+ * Sanitizes path/name segments for token paths and filenames.
+ */
 function sanitizeSegment(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9._-]/g, "");
 }
 
+/**
+ * Maps domain input to the domain segment used in token filenames.
+ */
 function toFilenameDomain(domain?: string): string {
   const normalized = sanitizeSegment(domain ?? "other");
   return DOMAIN_FILENAME_MAP[normalized] ?? normalized;
 }
 
+/**
+ * Returns the token file path that should be mutated for a token operation.
+ */
 function getTokenFilePathForHierarchy(data: TokenData): string {
   const level = getNormalizedNamespaceLevel(data);
 
@@ -106,6 +138,9 @@ function getTokenFilePathForHierarchy(data: TokenData): string {
   }
 }
 
+/**
+ * Recursively lists token files below a directory.
+ */
 function listTokenFiles(dirPath: string): string[] {
   if (!existsSync(dirPath)) {
     return [];
@@ -129,6 +164,9 @@ function listTokenFiles(dirPath: string): string[] {
   return files;
 }
 
+/**
+ * Finds the first token file containing a given token path.
+ */
 function findTokenFileByPath(tokenPath: string): string | undefined {
   const tokenFiles = listTokenFiles(TOKENS_DIR);
   for (const filePath of tokenFiles) {
@@ -140,40 +178,64 @@ function findTokenFileByPath(tokenPath: string): string | undefined {
   return undefined;
 }
 
+/**
+ * Builds a normalized hierarchical token path from TokenData input.
+ */
 function buildHierarchicalTokenPath(data: TokenData): string {
   const level = getNormalizedNamespaceLevel(data);
   const domain = getNormalizedNamespaceDomain(data);
   const theme = getNormalizedNamespaceTheme(data);
   const name = sanitizeSegment(data.name ?? "");
   const objectPath = sanitizeSegment(data.objectPath ?? "").replace(/^\.+|\.+$/g, "");
-
-  // For create we accept either object-path directly or name fallback.
-  const relativePath = objectPath || name;
-  if (!relativePath) {
-    return "";
-  }
+  const basePath = sanitizeSegment(data.basePath ?? "").replace(/^\.+|\.+$/g, "");
+  const modifierPath = sanitizeSegment(data.modifierPath ?? "").replace(/^\.+|\.+$/g, "");
 
   // Legacy path builder support for old templates.
   if (level === "legacy") {
-    return buildTokenPath(name || objectPath, data.group);
+    const legacyName = name || objectPath || basePath;
+    if (!legacyName) return "";
+    return buildTokenPath(legacyName, data.group);
   }
 
+  // Assemble the sub-path from object + base + modifier segments, skipping empty parts.
+  const subParts = [objectPath, basePath, modifierPath].filter(Boolean);
+
+  // For backward compat: if only objectPath is supplied (no basePath/modifierPath),
+  // treat it as the full relative path (legacy issue-form behaviour).
+  // If basePath is provided, use the explicit 3-segment composition.
+  const relativePath = subParts.join(".");
+
+  // Fallback: name-based legacy support.
+  if (!relativePath && !name) {
+    return "";
+  }
+
+  const resolvedRelative = relativePath || name;
+
   if (level === "universal") {
-    return `universal.${domain}.${relativePath}`;
+    const parts = ["universal", domain, resolvedRelative].filter(Boolean);
+    return parts.join(".");
   }
 
   if (level === "system") {
-    const themePart = theme && theme !== "universal" ? `${theme}.` : "";
-    return `system.${themePart}${domain}.${relativePath}`;
+    const themePart = theme && theme !== "universal" ? theme : "";
+    const parts = ["system", themePart, domain, resolvedRelative].filter(Boolean);
+    return parts.join(".");
   }
 
   if (level === "semantic") {
-    return `semantic.${domain}.${relativePath}`;
+    const parts = ["semantic", domain, resolvedRelative].filter(Boolean);
+    return parts.join(".");
   }
 
-  return `component.${relativePath}`;
+  // component — no domain prefix
+  const parts = ["component", resolvedRelative].filter(Boolean);
+  return parts.join(".");
 }
 
+/**
+ * Parses raw CLI token values into a DTCG-compatible token value object.
+ */
 export function parseTokenValue(value: string): TokenValue {
   try {
     const parsed = JSON.parse(value);
@@ -187,6 +249,9 @@ export function parseTokenValue(value: string): TokenValue {
 }
 
 
+/**
+ * Writes a value to a nested object path using dot notation.
+ */
 export function setNestedValue(
   obj: TokenObject,
   pathStr: string,
@@ -213,6 +278,11 @@ export function setNestedValue(
   (current as TokenObject)[parts[parts.length - 1]] = value;
 }
 
+/**
+ * Deletes a value at a nested object path.
+ *
+ * @returns `true` when the target key existed and was deleted.
+ */
 export function deleteNestedValue(obj: TokenObject, pathStr: string): boolean {
   const parts = pathStr.split(".");
   let current: TokenObject | TokenValue | any = obj;
@@ -233,6 +303,9 @@ export function deleteNestedValue(obj: TokenObject, pathStr: string): boolean {
   return false;
 }
 
+/**
+ * Reads a value at a nested object path.
+ */
 export function getNestedValue(
   obj: TokenObject,
   pathStr: string
@@ -251,6 +324,9 @@ export function getNestedValue(
   return current;
 }
 
+/**
+ * Removes now-empty parent objects after a child deletion.
+ */
 export function cleanEmptyParents(obj: TokenObject, pathStr: string): void {
   const parts = pathStr.split(".");
 
@@ -266,6 +342,9 @@ export function cleanEmptyParents(obj: TokenObject, pathStr: string): void {
   }
 }
 
+/**
+ * Legacy category-based token file path helper.
+ */
 export function getTokenFilePath(category: string): string {
   const categoryDir = join(TOKENS_DIR, category);
 
@@ -276,6 +355,9 @@ export function getTokenFilePath(category: string): string {
   return join(categoryDir, "base.tokens.json");
 }
 
+/**
+ * Reads a token file if present, otherwise returns an empty object.
+ */
 export function readTokenFile(filePath: string): TokenObject {
   if (existsSync(filePath)) {
     const content = readFileSync(filePath, "utf8");
@@ -284,10 +366,16 @@ export function readTokenFile(filePath: string): TokenObject {
   return {};
 }
 
+/**
+ * Writes a token object to disk with stable pretty formatting.
+ */
 export function writeTokenFile(filePath: string, data: TokenObject): void {
   writeFileSync(filePath, JSON.stringify(data, null, 2) + "\n");
 }
 
+/**
+ * Legacy token path helper that prepends an optional group.
+ */
 export function buildTokenPath(tokenName: string, tokenGroup?: string): string {
   if (tokenGroup && tokenGroup.trim()) {
     return `${tokenGroup.trim()}.${tokenName}`;
@@ -295,6 +383,9 @@ export function buildTokenPath(tokenName: string, tokenGroup?: string): string {
   return tokenName;
 }
 
+/**
+ * Creates a token in the resolved target file and validates before write.
+ */
 export function createToken(data: TokenData): void {
   const filePath = getTokenFilePathForHierarchy(data);
   const tokens = readTokenFile(filePath);
@@ -347,6 +438,9 @@ export function createToken(data: TokenData): void {
   console.log(`✅ Created token: ${tokenPath} = ${JSON.stringify(tokenValue)}`);
 }
 
+/**
+ * Updates an existing token and validates the file before write.
+ */
 export function updateToken(data: TokenData): void {
   if (!data.tokenPath && !data.objectPath) {
     console.error("Token path (--token-path) or object path (--object-path) is required for update action");
@@ -397,6 +491,9 @@ export function updateToken(data: TokenData): void {
   console.log(`✅ Updated token: ${tokenPath} = ${JSON.stringify(tokenValue)}`);
 }
 
+/**
+ * Deletes an existing token and prunes empty parent groups.
+ */
 export function deleteToken(data: TokenData): void {
   if (!data.tokenPath && !data.objectPath) {
     console.error("Token path (--token-path) or object path (--object-path) is required for delete action");

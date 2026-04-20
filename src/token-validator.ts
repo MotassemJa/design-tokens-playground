@@ -2,6 +2,9 @@
  * Runtime schema validation for Design Tokens according to W3C DTCG format.
  */
 
+/**
+ * DTCG token node shape used by the runtime validator.
+ */
 export interface DesignTokenValue {
   $type?:
     | "color"
@@ -35,6 +38,9 @@ export interface DesignTokenValue {
   $deprecated?: boolean | string;
 }
 
+/**
+ * Recursive token group containing nested groups and/or token values.
+ */
 export interface TokenGroup {
   [key: string]: DesignTokenValue | TokenGroup;
 }
@@ -75,6 +81,13 @@ export class TokenValidator {
   private errors: string[] = [];
   private warnings: string[] = [];
 
+  /**
+   * Validates token schema and type/value compatibility.
+   *
+   * @param tokens Token tree to validate.
+   * @param path Optional base path used for nested validation contexts.
+   * @returns `true` when validation completes with no errors.
+   */
   validate(tokens: TokenGroup, path: string = ""): boolean {
     this.errors = [];
     this.warnings = [];
@@ -115,11 +128,17 @@ export class TokenValidator {
     }
   }
 
+  /**
+   * Extracts the hierarchy layer from a token path.
+   */
   private extractLayer(tokenPath: string): string | null {
     const match = tokenPath.match(/^(universal|system|semantic|component)/);
     return match ? match[1] : null;
   }
 
+  /**
+   * Extracts all `{...}` token references from a string value.
+   */
   private extractReferences(value: string): string[] {
     const references: string[] = [];
     const regex = /\{([a-zA-Z0-9._-]+)\}/g;
@@ -132,6 +151,9 @@ export class TokenValidator {
     return references;
   }
 
+  /**
+   * Enforces allowed cross-layer reference combinations.
+   */
   private validateReference(refPath: string, tokenPath: string, tokenLayer: string | null): void {
     if (!tokenLayer) return; // Skip if token path doesn't match 4-layer structure
 
@@ -160,6 +182,9 @@ export class TokenValidator {
     }
   }
 
+  /**
+   * Recursively validates each node in a token group.
+   */
   private validateTokenGroup(group: TokenGroup, basePath: string = ""): void {
     for (const [key, value] of Object.entries(group)) {
       const currentPath = basePath ? `${basePath}.${key}` : key;
@@ -174,6 +199,9 @@ export class TokenValidator {
     }
   }
 
+  /**
+   * Detects whether a node is a token leaf based on `$value`.
+   */
   private isDesignToken(value: unknown): boolean {
     return (
       typeof value === "object" &&
@@ -182,6 +210,9 @@ export class TokenValidator {
     );
   }
 
+  /**
+   * Validates a single token leaf.
+   */
   private validateToken(token: DesignTokenValue, path: string): void {
     if (!Object.prototype.hasOwnProperty.call(token, "$value")) {
       this.errors.push(`Token at path '${path}' is missing required $value property`);
@@ -219,6 +250,9 @@ export class TokenValidator {
     this.validateTokenValue(token, path, normalizedType);
   }
 
+  /**
+   * Normalizes legacy token types to supported DTCG types where possible.
+   */
   private normalizeType(type: DesignTokenValue["$type"], path: string): DesignTokenValue["$type"] | undefined {
     if (!type) return undefined;
 
@@ -237,6 +271,9 @@ export class TokenValidator {
     return type;
   }
 
+  /**
+   * Applies type-specific validation for a token value.
+   */
   private validateTokenValue(
     token: DesignTokenValue,
     path: string,
@@ -323,6 +360,9 @@ export class TokenValidator {
     }
   }
 
+  /**
+   * Checks whether a value is a valid color literal or reference.
+   */
   private isValidColor(value: unknown): boolean {
     if (typeof value !== "string") return false;
     if (/^#[0-9A-F]{6}([0-9A-F]{2})?$/i.test(value)) return true;
@@ -345,14 +385,23 @@ export class TokenValidator {
     return false;
   }
 
+  /**
+   * Checks whether a value is a token reference of the form `{path.to.token}`.
+   */
   private isTokenReference(value: string): boolean {
     return /^\{[a-zA-Z0-9._-]+\}$/.test(value);
   }
 
+  /**
+   * Checks whether a value is a valid duration literal or reference.
+   */
   private isValidDuration(value: string): boolean {
     return /^\d+(\.\d+)?(ms|s)$/.test(value) || this.isTokenReference(value);
   }
 
+  /**
+   * Checks whether a value is a valid font-weight literal.
+   */
   private isValidFontWeight(value: unknown): boolean {
     if (typeof value === "number" && value >= 100 && value <= 900) return true;
 
@@ -374,6 +423,9 @@ export class TokenValidator {
     return false;
   }
 
+  /**
+   * Checks whether a value is a valid opacity literal or reference.
+   */
   private isValidOpacity(value: unknown): boolean {
     if (typeof value === "number") {
       return (value >= 0 && value <= 1) || (value >= 0 && value <= 100);
@@ -393,10 +445,16 @@ export class TokenValidator {
     return false;
   }
 
+  /**
+   * Returns validation errors from the latest run.
+   */
   getErrors(): string[] {
     return this.errors;
   }
 
+  /**
+   * Returns validation warnings from the latest run.
+   */
   getWarnings(): string[] {
     return this.warnings;
   }

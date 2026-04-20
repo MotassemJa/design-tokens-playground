@@ -7,19 +7,22 @@ body:
     attributes:
       value: |
         ## Delete a Design Token
-        
-        ⚠️ **Warning**: Deleting tokens may break existing implementations and any tokens in higher layers that reference them. Please ensure you have:
-        1. Verified there are no dependent tokens in higher layers
-        2. Notified consuming teams of this change
-        3. Provided a migration path (replacement token if applicable)
-        
-        See [Token Hierarchy Documentation](../../README.md#token-hierarchy--inheritance-rules) for details.
+
+        ⚠️ **Warning**: Deleting tokens may break existing implementations and any tokens in higher layers that reference them. Before submitting:
+
+        1. Verify there are no dependent tokens in higher layers
+        2. Notify consuming teams of this change
+        3. Provide a migration path (replacement token if applicable)
+
+        Locate the token using the same namespace + path fields used when it was created.
+
+        See [Token Naming Conventions](../../README.md#token-naming-conventions) for details.
 
   - type: dropdown
     id: namespace-level
     attributes:
-      label: Namespace - Level
-      description: "Line 1 / namespace input 1: hierarchy layer that contains this token"
+      label: Namespace — Level
+      description: "Hierarchy layer that contains this token."
       options:
         - universal
         - system
@@ -31,46 +34,53 @@ body:
   - type: input
     id: namespace-theme
     attributes:
-      label: Namespace - Theme
-      description: "Line 1 / namespace input 2: optional (mainly for system level)"
-      placeholder: "light, dark, high-contrast, or leave empty"
+      label: Namespace — Theme
+      description: "Optional theme qualifier. Mainly used for `system` layer tokens."
+      placeholder: "light, dark, high-contrast — or leave empty"
     validations:
       required: false
 
-  - type: dropdown
+  - type: input
     id: namespace-domain
     attributes:
-      label: Namespace - Domain
-      description: "Line 1 / namespace input 3: design domain"
-      options:
-        - color
-        - spacing
-        - typography
-        - size
-        - duration
-        - border
-        - shadow
-        - button
-        - card
-        - input
-        - other
+      label: Namespace — Domain
+      description: "Design domain for this token."
+      placeholder: "color, spacing, typography, size, duration, border, shadow — or a component name"
     validations:
-      required: true
+      required: false
 
   - type: input
     id: object-path
     attributes:
       label: Object Path
       description: |
-        Line 2: object path inside the selected namespace.
-        Examples:
-        - universal + color + deprecated-blue => `object-path: deprecated-blue`
-        - system + light + color + brand.old-primary => `object-path: brand.old-primary`
-        - semantic + color + old-action.primary => `object-path: old-action.primary`
-        - component + legacy-button.primary.background => `object-path: legacy-button.primary.background`
-      placeholder: "deprecated.old-primary"
+        Dot-notation group/component/element segments. Optional.
+        Examples: `button`, `button.container`, `forms.input.label`
+      placeholder: "button.container"
+    validations:
+      required: false
+
+  - type: input
+    id: base-path
+    attributes:
+      label: Base Path
+      description: |
+        Dot-notation category/concept/property segments.
+        Examples: `color`, `color.background`, `space.padding`
+      placeholder: "color.background"
     validations:
       required: true
+
+  - type: input
+    id: modifier-path
+    attributes:
+      label: Modifier Path
+      description: |
+        Dot-notation variant/state/scale/mode segments. Optional.
+        Examples: `primary`, `primary.hover`, `solid.hover.on-light`
+      placeholder: "solid.hover.on-light"
+    validations:
+      required: false
 
   - type: textarea
     id: reason
@@ -88,7 +98,7 @@ body:
       description: What tokens or components depend on this token? Are there any higher-layer tokens that reference it?
       placeholder: |
         - Dependent tokens: semantic.color.action.primary references this token
-        - Affected components: component.button.primary, component.link
+        - Affected components: component.button.container, component.nav.item
     validations:
       required: true
 

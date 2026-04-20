@@ -2,11 +2,16 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 /**
- * Loads and merges token files from the filesystem
+ * Loads and merges token files from the filesystem.
+ *
+ * Token files are discovered recursively under `tokens/`.
  */
 export class TokenLoader {
   private static readonly TOKENS_ROOT = "tokens";
 
+  /**
+   * Recursively discovers `*.tokens.json` files in directory order.
+   */
   private discoverTokenFiles(dir: string): string[] {
     const entries = readdirSync(dir, { withFileTypes: true });
     const files: string[] = [];
@@ -27,7 +32,10 @@ export class TokenLoader {
   }
 
   /**
-   * Load all token files and merge them into a single object
+    * Loads all token files and merges them into one token tree.
+    *
+    * @returns Merged token object used by validators/builders.
+    * @throws Error When token root cannot be read, no files are found, or JSON cannot be parsed.
    */
   loadTokens(): Record<string, unknown> {
     const allTokens: Record<string, unknown> = {};
@@ -61,7 +69,7 @@ export class TokenLoader {
   }
 
   /**
-   * Deep merge tokens from source into target
+    * Deep-merges source token objects into the target token tree.
    */
   private mergeTokens(target: Record<string, unknown>, source: Record<string, unknown>): void {
     for (const key in source) {

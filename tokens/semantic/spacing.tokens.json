@@ -6,21 +6,7 @@
           "padding": {
             "$value": "{system.spacing.component.button.padding-horizontal}",
             "$type": "dimension",
-            "$description": "Semantic spacing for button padding - references system spacing"
-          }
-        },
-        "input": {
-          "padding": {
-            "$value": "{system.spacing.component.input.padding-horizontal}",
-            "$type": "dimension",
-            "$description": "Semantic spacing for input padding - references system spacing"
-          }
-        },
-        "card": {
-          "padding": {
-            "$value": "{system.spacing.component.card.padding}",
-            "$type": "dimension",
-            "$description": "Semantic spacing for card padding - references system spacing"
+            "$description": "Semantic default button padding"
           }
         }
       }

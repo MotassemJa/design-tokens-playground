@@ -3,69 +3,10 @@
     "font": {
       "family": {
         "sans": {
-          "$value": "system-ui, -apple-system, sans-serif",
+          "$value": "system-ui, sans-serif",
           "$type": "fontFamily",
-          "$description": "Universal sans-serif font family"
-        },
-        "serif": {
-          "$value": "Georgia, serif",
-          "$type": "fontFamily",
-          "$description": "Universal serif font family"
-        },
-        "mono": {
-          "$value": "Menlo, monospace",
-          "$type": "fontFamily",
-          "$description": "Universal monospace font family"
+          "$description": "Base UI font family"
         }
-      },
-      "weight": {
-        "regular": {
-          "$value": 400,
-          "$type": "fontWeight",
-          "$description": "Universal regular font weight"
-        },
-        "medium": {
-          "$value": 500,
-          "$type": "fontWeight",
-          "$description": "Universal medium font weight"
-        },
-        "bold": {
-          "$value": 700,
-          "$type": "fontWeight",
-          "$description": "Universal bold font weight"
-        }
-      }
-    },
-    "size": {
-      "12": {
-        "$value": "0.75rem",
-        "$type": "fontSize",
-        "$description": "Universal font size 12px"
-      },
-      "14": {
-        "$value": "0.875rem",
-        "$type": "fontSize",
-        "$description": "Universal font size 14px"
-      },
-      "16": {
-        "$value": "1rem",
-        "$type": "fontSize",
-        "$description": "Universal font size 16px (base)"
-      },
-      "18": {
-        "$value": "1.125rem",
-        "$type": "fontSize",
-        "$description": "Universal font size 18px"
-      },
-      "20": {
-        "$value": "1.25rem",
-        "$type": "fontSize",
-        "$description": "Universal font size 20px"
-      },
-      "24": {
-        "$value": "1.5rem",
-        "$type": "fontSize",
-        "$description": "Universal font size 24px"
       }
     }
   }

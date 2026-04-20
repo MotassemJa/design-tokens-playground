@@ -7,21 +7,28 @@ body:
     attributes:
       value: |
         ## Create a New Design Token
-        
-        Design tokens are organized in a 4-layer hierarchy. Choose the appropriate layer for your token:
-        
-        **LAYER 1 - Universal**: Primitive values (colors, spacing, typography) - self-contained, no references
-        **LAYER 2 - System**: Theme-aware tokens (light/dark) - references universal only
-        **LAYER 3 - Semantic**: Intent-driven tokens (action, feedback) - references system only
-        **LAYER 4 - Component**: UI component styles - references semantic only
-        
-        See [Token Hierarchy Documentation](../../README.md#4-layer-token-hierarchy) for details.
+
+        Design tokens follow a 4-layer hierarchy with a structured naming convention.
+
+        **Hierarchy rules:**
+        - **Layer 1 — Universal**: Primitive values only. No references. (`universal.*`)
+        - **Layer 2 — System**: Theme-aware tokens. References `universal.*` only. (`system.[theme].*`)
+        - **Layer 3 — Semantic**: Intent-driven tokens. References `system.*` only. (`semantic.*`)
+        - **Layer 4 — Component**: UI component styles. References `semantic.*` only. (`component.*`)
+
+        **Token name anatomy:**
+        ```
+        --ds [.theme] [.domain] [.object-path] [.base-path] [.modifier-path]
+        ```
+        Example: `--ds.button.container.color.background.solid.hover.on-light`
+
+        See [Token Naming Conventions](../../README.md#token-naming-conventions) for the full reference.
 
   - type: dropdown
     id: namespace-level
     attributes:
-      label: Namespace - Level
-      description: "Line 1 / namespace input 1: choose the hierarchy layer"
+      label: Namespace — Level
+      description: "Choose the hierarchy layer for this token."
       options:
         - universal
         - system
@@ -33,60 +40,73 @@ body:
   - type: input
     id: namespace-theme
     attributes:
-      label: Namespace - Theme
-      description: "Line 1 / namespace input 2: optional (mainly for system level)"
-      placeholder: "light, dark, high-contrast, or leave empty"
+      label: Namespace — Theme
+      description: "Optional theme qualifier. Mainly used for `system` layer tokens."
+      placeholder: "light, dark, high-contrast — or leave empty"
     validations:
       required: false
 
-  - type: dropdown
+  - type: input
     id: namespace-domain
     attributes:
-      label: Namespace - Domain
-      description: "Line 1 / namespace input 3: design domain"
-      options:
-        - color
-        - spacing
-        - typography
-        - size
-        - duration
-        - border
-        - shadow
-        - button
-        - card
-        - input
-        - other
+      label: Namespace — Domain
+      description: "Design domain for this token."
+      placeholder: "color, spacing, typography, size, duration, border, shadow — or a component name"
     validations:
-      required: true
+      required: false
 
   - type: input
     id: object-path
     attributes:
       label: Object Path
       description: |
-        Line 2: object path inside the selected namespace.
-        The final token path is assembled as:
-        - universal: `universal.{domain}.{object-path}`
-        - system: `system.{theme?}.{domain}.{object-path}`
-        - semantic: `semantic.{domain}.{object-path}`
-        - component: `component.{object-path}`
-      placeholder: "brand.primary or button.primary.background"
+        Dot-notation path for the group, component, and/or element segments. Optional.
+        - `button` — just a component
+        - `button.container` — component + element
+        - `forms.input.label` — group + component + element
+      placeholder: "button.container"
+    validations:
+      required: false
+
+  - type: input
+    id: base-path
+    attributes:
+      label: Base Path
+      description: |
+        Dot-notation path for the category, concept, and/or property segments.
+        - `color` — category only
+        - `color.background` — category + property
+        - `space.padding` — category + property
+      placeholder: "color.background"
     validations:
       required: true
+
+  - type: input
+    id: modifier-path
+    attributes:
+      label: Modifier Path
+      description: |
+        Dot-notation path for variant, state, scale, and/or mode. Optional.
+        - `primary` — variant only
+        - `primary.hover` — variant + state
+        - `solid.hover.on-light` — variant + state + mode
+      placeholder: "solid.hover.on-light"
+    validations:
+      required: false
 
   - type: textarea
     id: token-value
     attributes:
       label: Token Value
       description: |
-        The value for this token. For references, use `{path.to.token}` syntax.
-        
-        Examples:
-        - Primitive color: `#3B82F6`
-        - System reference: `{universal.color.blue}`
-        - Semantic reference: `{system.light.color.brand.primary}`
-        - Component reference: `{semantic.color.action.primary}`
-      placeholder: "#3B82F6 or {universal.color.blue}"
+        The value for this token. Use `{path.to.token}` syntax for references.
+
+        **By layer:**
+        - Universal: raw value only — `#3B82F6`, `1rem`, `700`
+        - System: reference to universal — `{universal.color.blue.500}`
+        - Semantic: reference to system — `{system.light.color.brand.primary}`
+        - Component: reference to semantic — `{semantic.color.action.primary}`
+      placeholder: "#3B82F6 or {semantic.color.action.primary}"
     validations:
       required: true
 
@@ -94,8 +114,8 @@ body:
     id: token-type
     attributes:
       label: Token Type
-      description: DTCG token type (color, dimension, fontSize, fontWeight, duration, border, shadow, etc.)
-      placeholder: "color or dimension"
+      description: "DTCG `$type` for this token."
+      placeholder: "color, dimension, fontSize, fontWeight, duration, border, shadow, opacity, …"
     validations:
       required: true
 
@@ -114,8 +134,8 @@ body:
       label: Usage Examples
       description: Where and how should this token be used?
       placeholder: |
-        - Primary buttons
-        - Active navigation items
+        - Primary buttons background
+        - Active navigation item highlight
         - Link text color
 
   - type: checkboxes
@@ -125,9 +145,9 @@ body:
       options:
         - label: I have checked that this token does not already exist in its layer
           required: true
-        - label: The namespace and object path follow naming conventions for the selected layer
+        - label: The namespace, object, base, and modifier paths follow the naming conventions
           required: true
-        - label: "(For non-universal): I am only referencing tokens from the layer directly above mine"
+        - label: "The `$value` references only tokens from the layer directly above (or is a raw value for universal)"
           required: true
-        - label: The $type value is valid per DTCG spec
+        - label: "The `$type` value is valid per the DTCG spec"
           required: true

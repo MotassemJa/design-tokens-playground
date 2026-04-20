@@ -1,55 +1,15 @@
 {
   "universal": {
     "spacing": {
-      "2": {
-        "$value": "0.125rem",
-        "$type": "dimension",
-        "$description": "Universal spacing 2px (2 * 0.125rem)"
-      },
-      "4": {
-        "$value": "0.25rem",
-        "$type": "dimension",
-        "$description": "Universal spacing 4px (base unit)"
-      },
       "8": {
         "$value": "0.5rem",
         "$type": "dimension",
-        "$description": "Universal spacing 8px (2x base)"
-      },
-      "12": {
-        "$value": "0.75rem",
-        "$type": "dimension",
-        "$description": "Universal spacing 12px (3x base)"
+        "$description": "Compact spacing primitive"
       },
       "16": {
         "$value": "1rem",
         "$type": "dimension",
-        "$description": "Universal spacing 16px (4x base)"
-      },
-      "20": {
-        "$value": "1.25rem",
-        "$type": "dimension",
-        "$description": "Universal spacing 20px (5x base)"
-      },
-      "24": {
-        "$value": "1.5rem",
-        "$type": "dimension",
-        "$description": "Universal spacing 24px (6x base)"
-      },
-      "32": {
-        "$value": "2rem",
-        "$type": "dimension",
-        "$description": "Universal spacing 32px (8x base)"
-      },
-      "40": {
-        "$value": "2.5rem",
-        "$type": "dimension",
-        "$description": "Universal spacing 40px (10x base)"
-      },
-      "48": {
-        "$value": "3rem",
-        "$type": "dimension",
-        "$description": "Universal spacing 48px (12x base)"
+        "$description": "Default spacing primitive"
       }
     }
   }

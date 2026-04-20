@@ -4,6 +4,9 @@
  * https://tr.w3.org/design-tokens/
  */
 
+/**
+ * DTCG token leaf shape used by workflow validation scripts.
+ */
 export interface DesignTokenValue {
   $type?:
     | "color"
@@ -37,6 +40,9 @@ export interface DesignTokenValue {
   $deprecated?: boolean | string;
 }
 
+/**
+ * Recursive token group shape accepted by validator entrypoints.
+ */
 export interface TokenGroup {
   [key: string]: DesignTokenValue | TokenGroup;
 }
@@ -73,6 +79,13 @@ export class TokenValidator {
   private errors: string[] = [];
   private warnings: string[] = [];
 
+  /**
+   * Validates the provided token object.
+   *
+   * @param tokens Root token object.
+   * @param path Optional base path for nested validation contexts.
+   * @returns `true` when no validation errors are produced.
+   */
   validate(tokens: TokenGroup, path: string = ""): boolean {
     this.errors = [];
     this.warnings = [];
@@ -82,6 +95,9 @@ export class TokenValidator {
     return this.errors.length === 0;
   }
 
+  /**
+   * Recursively validates nested token groups and token leaves.
+   */
   private validateTokenGroup(group: TokenGroup, basePath: string = ""): void {
     for (const [key, value] of Object.entries(group)) {
       const currentPath = basePath ? `${basePath}.${key}` : key;
@@ -96,6 +112,9 @@ export class TokenValidator {
     }
   }
 
+  /**
+   * Detects token leaves by checking for a `$value` field.
+   */
   private isDesignToken(value: unknown): boolean {
     return (
       typeof value === "object" &&
@@ -104,6 +123,9 @@ export class TokenValidator {
     );
   }
 
+  /**
+   * Validates an individual token leaf.
+   */
   private validateToken(token: DesignTokenValue, path: string): void {
     // Check required $value
     if (!("$value" in token)) {
@@ -139,6 +161,9 @@ export class TokenValidator {
     this.validateTokenValue(token, path);
   }
 
+  /**
+   * Runs type-specific value validation logic.
+   */
   private validateTokenValue(token: DesignTokenValue, path: string): void {
     const value = token.$value;
 
@@ -225,6 +250,9 @@ export class TokenValidator {
     }
   }
 
+  /**
+   * Checks whether a value is a valid color literal or token reference.
+   */
   private isValidColor(value: unknown): boolean {
     if (typeof value !== "string") return false;
     // Hex
@@ -249,14 +277,23 @@ export class TokenValidator {
     return false;
   }
 
+  /**
+   * Checks whether a value matches token reference syntax `{path.to.token}`.
+   */
   private isTokenReference(value: string): boolean {
     return /^\{[a-zA-Z0-9._-]+\}$/.test(value);
   }
 
+  /**
+   * Checks duration syntax (`ms`/`s`) or token references.
+   */
   private isValidDuration(value: string): boolean {
     return /^\d+(\.\d+)?(ms|s)$/.test(value) || this.isTokenReference(value);
   }
 
+  /**
+   * Checks numeric and keyword font-weight values.
+   */
   private isValidFontWeight(value: unknown): boolean {
     if (typeof value === "number" && value >= 100 && value <= 900) return true;
     if (typeof value === "string") {
@@ -276,6 +313,9 @@ export class TokenValidator {
     return false;
   }
 
+  /**
+   * Checks opacity as number, percentage string, or reference.
+   */
   private isValidOpacity(value: unknown): boolean {
     if (typeof value === "number") {
       return (value >= 0 && value <= 1) || (value >= 0 && value <= 100);
@@ -292,14 +332,23 @@ export class TokenValidator {
     return false;
   }
 
+  /**
+   * Returns validation errors from the latest run.
+   */
   getErrors(): string[] {
     return this.errors;
   }
 
+  /**
+   * Returns validation warnings from the latest run.
+   */
   getWarnings(): string[] {
     return this.warnings;
   }
 
+  /**
+   * Returns a structured validation report payload.
+   */
   getReport(): { valid: boolean; errors: string[]; warnings: string[] } {
     return {
       valid: this.errors.length === 0,

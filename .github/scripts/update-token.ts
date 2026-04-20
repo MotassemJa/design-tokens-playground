@@ -4,6 +4,9 @@ import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 import { updateToken, type TokenData } from "./token-common.ts";
 
+/**
+ * CLI argument parser for token update requests.
+ */
 const argv = await yargs(hideBin(process.argv))
   .option("namespace-level", {
     type: "string",
@@ -20,7 +23,17 @@ const argv = await yargs(hideBin(process.argv))
   .option("object-path", {
     alias: "o",
     type: "string",
-    description: "Object path within the namespace (dot notation)",
+    description: "Object path: group.component.element (dot notation, optional)",
+  })
+  .option("base-path", {
+    alias: "b",
+    type: "string",
+    description: "Base path: category.concept.property (dot notation)",
+  })
+  .option("modifier-path", {
+    alias: "x",
+    type: "string",
+    description: "Modifier path: variant.state.scale.mode (dot notation, optional)",
   })
   .option("hierarchy-level", {
     alias: "l",
@@ -62,6 +75,9 @@ const argv = await yargs(hideBin(process.argv))
   .strict()
   .parseAsync();
 
+/**
+ * Normalized payload passed to shared token update logic.
+ */
 const tokenData: TokenData = {
   action: "update",
   category: argv.category,
@@ -69,6 +85,8 @@ const tokenData: TokenData = {
   namespaceTheme: argv["namespace-theme"],
   namespaceDomain: argv["namespace-domain"],
   objectPath: argv["object-path"],
+  basePath: argv["base-path"],
+  modifierPath: argv["modifier-path"],
   hierarchyLevel: argv["hierarchy-level"],
   domain: argv.domain,
   tokenPath: argv["token-path"],

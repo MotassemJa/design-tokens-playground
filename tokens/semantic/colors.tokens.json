@@ -5,78 +5,12 @@
         "primary": {
           "$value": "{system.light.color.brand.primary}",
           "$type": "color",
-          "$description": "Primary interactive element color for CTAs, links, and key interactions - references system light theme"
+          "$description": "Semantic primary interactive color"
         },
-        "primaryText": {
-          "$value": "#FFFFFF",
+        "primary-text": {
+          "$value": "{system.light.color.text.on-brand}",
           "$type": "color",
-          "$description": "Primary interactive element text color"
-        },
-        "secondary": {
-          "$value": "{system.light.color.brand.secondary}",
-          "$type": "color",
-          "$description": "Secondary interactive element color for less prominent interactions - references system light theme"
-        },
-        "secondaryText": {
-          "$value": "#FFFFFF",
-          "$type": "color",
-          "$description": "Secondary interactive element text color"
-        }
-      },
-      "feedback": {
-        "success": {
-          "$value": "{system.light.color.feedback.success}",
-          "$type": "color",
-          "$description": "Color indicating successful state or positive feedback - references system light theme"
-        },
-        "error": {
-          "$value": "{system.light.color.feedback.error}",
-          "$type": "color",
-          "$description": "Color indicating error state or negative feedback - references system light theme"
-        },
-        "warning": {
-          "$value": "{system.light.color.feedback.warning}",
-          "$type": "color",
-          "$description": "Color indicating warning state or caution - references system light theme"
-        },
-        "info": {
-          "$value": "{system.light.color.feedback.success}",
-          "$type": "color",
-          "$description": "Color indicating informational state or neutral message - references system light theme"
-        }
-      },
-      "background": {
-        "default": {
-          "$value": "{system.light.color.background.default}",
-          "$type": "color",
-          "$description": "Default background color for main content areas - references system light theme"
-        },
-        "secondary": {
-          "$value": "{system.light.color.background.secondary}",
-          "$type": "color",
-          "$description": "Secondary background color for alternate sections - references system light theme"
-        },
-        "tertiary": {
-          "$value": "#e5e7eb",
-          "$type": "color",
-          "$description": "Tertiary background color for interactive elements"
-        }
-      },
-      "text": {
-        "primary": {
-          "$value": "{system.light.color.text.primary}",
-          "$type": "color",
-          "$description": "Primary text color for main content - references system light theme"
-        },
-        "secondary": {
-          "$value": "{system.light.color.text.secondary}",
-          "$type": "color",
-          "$description": "Secondary text color for supporting information - references system light theme"
-        },
-        "disabled": {
-          "$value": "#d1d5db",
-          "$type": "color",
-          "$description": "Text color for disabled states"
+          "$description": "Semantic text color for interactive primary surfaces"
         }
       }
     }

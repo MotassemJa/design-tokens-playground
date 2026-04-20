@@ -9,14 +9,23 @@ import { BuildConfig, type BuildOptions } from "./build-config.js";
 
 const tokenLoader = new TokenLoader();
 
+/**
+ * Creates a JSON-safe deep clone for token trees.
+ */
 function deepClone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
+/**
+ * Normalizes unknown runtime output into an object map.
+ */
 function toObject(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" ? (value as Record<string, unknown>) : {};
 }
 
+/**
+ * Converts flat primitive arrays into CSS-like space-delimited values.
+ */
 function normalizeInterpretedValue(value: unknown): unknown {
   if (Array.isArray(value) && value.every((entry) => ["string", "number", "boolean"].includes(typeof entry))) {
     return value.join(" ");
@@ -25,6 +34,9 @@ function normalizeInterpretedValue(value: unknown): unknown {
   return value;
 }
 
+/**
+ * Applies interpreted value normalization across flat token path maps.
+ */
 function normalizeFlatInterpretedValues(flatValues: Record<string, unknown>): Record<string, unknown> {
   return Object.fromEntries(
     Object.entries(flatValues).map(([tokenPath, interpretedValue]) => [
@@ -34,6 +46,9 @@ function normalizeFlatInterpretedValues(flatValues: Record<string, unknown>): Re
   );
 }
 
+/**
+ * Sets a value at a dotted path represented as a path segment array.
+ */
 function setNestedValue(target: Record<string, unknown>, path: string[], nextValue: unknown): void {
   let current: Record<string, unknown> = target;
 
@@ -55,6 +70,11 @@ function setNestedValue(target: Record<string, unknown>, path: string[], nextVal
   }
 }
 
+/**
+ * Applies interpreted token values onto `$value` properties in a token tree.
+ *
+ * Token paths that cannot be resolved in the current tree are skipped.
+ */
 function applyInterpretedValues(
   tokens: Record<string, unknown>,
   flatInterpretedValues: Record<string, unknown>
@@ -82,6 +102,9 @@ function applyInterpretedValues(
   return cloned;
 }
 
+/**
+ * Builds a flattened interpreted JSON output used by `tokens.interpreted.json`.
+ */
 function buildInterpretedJson(
   interpretedTokenTree: Record<string, unknown>,
   flatInterpretedValues: Record<string, unknown>
@@ -95,6 +118,9 @@ function buildInterpretedJson(
   return result;
 }
 
+/**
+ * Converts interpreter issue maps into concise warning lines for logs.
+ */
 function formatIssues(issues: Map<string, unknown[]>, maxLines = 20): string {
   const lines: string[] = [];
 
@@ -122,6 +148,19 @@ function formatIssues(issues: Map<string, unknown[]>, maxLines = 20): string {
   return lines.join("\n");
 }
 
+/**
+ * Runs the complete token build pipeline.
+ *
+ * Flow:
+ * 1. Load and merge token files.
+ * 2. Validate token schema and hierarchy.
+ * 3. Interpret values via TokenScript (best effort).
+ * 4. Build CSS/JS/types outputs with Style Dictionary.
+ * 5. Write raw/resolved/interpreted JSON artifacts.
+ *
+ * @param options Optional build customization values.
+ * @throws Error when token validation or hierarchy validation fails.
+ */
 export async function buildTokens(options: BuildOptions = {}) {
   const {
     outputDir = "dist",

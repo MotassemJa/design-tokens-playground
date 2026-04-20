@@ -5,104 +5,23 @@
         "background": {
           "$value": "{semantic.color.interactive.primary}",
           "$type": "color",
-          "$description": "Background color for primary buttons - references semantic interactive primary"
+          "$description": "Primary button background"
         },
         "text": {
-          "$value": "{semantic.color.interactive.primaryText}",
+          "$value": "{semantic.color.interactive.primary-text}",
           "$type": "color",
-          "$description": "Text color for primary buttons - references semantic interactive primary text"
+          "$description": "Primary button text color"
         },
         "padding": {
           "$value": "{semantic.spacing.component.button.padding}",
           "$type": "dimension",
-          "$description": "Responsive padding for primary buttons - references semantic spacing"
+          "$description": "Primary button padding"
         },
         "border-radius": {
           "$value": "0.375rem",
           "$type": "borderRadius",
-          "$description": "Border radius for primary buttons"
-        },
-        "border": {
-          "$value": "none",
-          "$type": "border",
-          "$description": "Border for primary buttons"
+          "$description": "Primary button corner radius"
         }
-      },
-      "secondary": {
-        "background": {
-          "$value": "{semantic.color.interactive.secondary}",
-          "$type": "color",
-          "$description": "Background color for secondary buttons - references semantic interactive secondary"
-        },
-        "text": {
-          "$value": "{semantic.color.interactive.secondaryText}",
-          "$type": "color",
-          "$description": "Text color for secondary buttons - references semantic interactive secondary text"
-        },
-        "padding": {
-          "$value": "{semantic.spacing.component.button.padding}",
-          "$type": "dimension",
-          "$description": "Responsive padding for secondary buttons - references semantic spacing"
-        },
-        "border-radius": {
-          "$value": "0.375rem",
-          "$type": "borderRadius",
-          "$description": "Border radius for secondary buttons"
-        },
-        "border": {
-          "$value": "1px solid {semantic.color.interactive.secondary}",
-          "$type": "border",
-          "$description": "Border for secondary buttons - references semantic interactive secondary"
-        }
-      }
-    },
-    "card": {
-      "background": {
-        "$value": "{semantic.color.background.default}",
-        "$type": "color",
-        "$description": "Background color for cards - references semantic background default"
-      },
-      "padding": {
-        "$value": "{semantic.spacing.component.card.padding}",
-        "$type": "dimension",
-        "$description": "Padding for cards - references semantic spacing"
-      },
-      "border-radius": {
-        "$value": "0.5rem",
-        "$type": "borderRadius",
-        "$description": "Border radius for cards"
-      },
-      "shadow": {
-        "$value": "0 4px 6px rgba(0, 0, 0, 0.1)",
-        "$type": "shadow",
-        "$description": "Shadow for cards"
-      }
-    },
-    "input": {
-      "background": {
-        "$value": "{semantic.color.background.default}",
-        "$type": "color",
-        "$description": "Background color for input fields - references semantic background default"
-      },
-      "text": {
-        "$value": "{semantic.color.text.primary}",
-        "$type": "color",
-        "$description": "Text color for input fields - references semantic text primary"
-      },
-      "border": {
-        "$value": "1px solid #d1d5db",
-        "$type": "border",
-        "$description": "Border for input fields"
-      },
-      "border-radius": {
-        "$value": "0.375rem",
-        "$type": "borderRadius",
-        "$description": "Border radius for input fields"
-      },
-      "padding": {
-        "$value": "{semantic.spacing.component.input.padding}",
-        "$type": "dimension",
-        "$description": "Padding for input fields - references semantic spacing"
       }
     }
   }

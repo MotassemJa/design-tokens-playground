@@ -3,6 +3,15 @@
 import { buildTokens } from "./build-tokens.js";
 import type { BuildOptions } from "./build-config.js";
 
+/**
+ * Parses CLI arguments into build options.
+ *
+ * Supported flags mirror the CLI help output and map directly to
+ * {@link BuildOptions} consumed by the build pipeline.
+ *
+ * @param args Raw process arguments after the node/script prefix.
+ * @returns Normalized build options with defaults applied.
+ */
 function parseArgs(args: string[]): BuildOptions {
   const options: BuildOptions = {
     outputDir: "dist",
@@ -47,6 +56,9 @@ function parseArgs(args: string[]): BuildOptions {
   return options;
 }
 
+/**
+ * Prints CLI usage instructions to stdout.
+ */
 function printHelp(): void {
   console.log(`
 🎨 Design Tokens Builder
@@ -70,6 +82,12 @@ Examples:
 `);
 }
 
+/**
+ * CLI entrypoint for local and CI token builds.
+ *
+ * The function short-circuits for help flags and otherwise executes
+ * the token build with parsed options.
+ */
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
 

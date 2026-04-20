@@ -1,11 +1,16 @@
 /**
- * Resolves token references in the format {path.to.token}
+ * Resolves token references in the format `{path.to.token}`.
+ *
+ * Supports exact references and embedded references inside string values.
  */
 export class TokenReferenceResolver {
   private tokens: Record<string, unknown> = {};
 
   /**
-   * Resolve all token references in a token object
+   * Resolves all references in a token object clone.
+   *
+   * @param tokens Source token tree.
+   * @returns New token tree with references resolved where possible.
    */
   resolveReferences(tokens: Record<string, unknown>): Record<string, unknown> {
     this.tokens = tokens;
@@ -14,7 +19,7 @@ export class TokenReferenceResolver {
   }
 
   /**
-   * Recursively resolve references in values
+    * Recursively resolves references in primitive values, arrays, and objects.
    */
   private resolveValue(value: unknown, path: string[] = [], stack: string[] = []): unknown {
     if (typeof value === "string") {
@@ -61,7 +66,9 @@ export class TokenReferenceResolver {
   }
 
   /**
-   * Resolve a single reference path
+    * Resolves a single reference path against the loaded token tree.
+    *
+    * Circular and unresolved references are preserved in original form.
    */
   private resolveReference(refPath: string, currentPath: string[], stack: string[]): unknown {
     if (stack.includes(refPath)) {

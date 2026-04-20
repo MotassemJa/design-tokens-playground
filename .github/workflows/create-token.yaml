@@ -64,8 +64,10 @@ jobs:
           npx tsx .github/scripts/create-token.ts \
             --namespace-level "${{ steps.parse.outputs['parsed_namespace-level'] != '' && fromJson(steps.parse.outputs['parsed_namespace-level'])[0] || '' }}" \
             --namespace-theme "${{ steps.parse.outputs['parsed_namespace-theme'] }}" \
-            --namespace-domain "${{ steps.parse.outputs['parsed_namespace-domain'] != '' && fromJson(steps.parse.outputs['parsed_namespace-domain'])[0] || '' }}" \
+            --namespace-domain "${{ steps.parse.outputs['parsed_namespace-domain'] }}" \
             --object-path "${{ steps.parse.outputs['parsed_object-path'] }}" \
+            --base-path "${{ steps.parse.outputs['parsed_base-path'] }}" \
+            --modifier-path "${{ steps.parse.outputs['parsed_modifier-path'] }}" \
             --token-type "${{ steps.parse.outputs['parsed_token-type'] }}" \
             --value "${{ steps.parse.outputs.parsed_token-value }}" \
             --description "${{ steps.parse.outputs.parsed_description }}"
