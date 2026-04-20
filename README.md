@@ -1,26 +1,26 @@
 # Design Tokens Playground
 
-A comprehensive design tokens system built with Style Dictionary, featuring advanced token processing with TokenScript integration, automated GitHub workflows, and a web-based preview tool.
+A comprehensive design tokens system built with Style Dictionary, featuring best-effort TokenScript processing, automated GitHub workflows, and a web-based preview tool.
 
 ## Features
 
 ### 🎨 Token Management
 - **GitHub Issue Integration**: Create, update, and delete tokens via GitHub Issues with automatic PR generation
-- **Schema Validation**: Full DTCG (Design Tokens Community Group) format validation
+- **Schema Validation**: Runtime DTCG-style validation in the build pipeline
 - **Token References**: Automatic resolution of token references using `{path.to.token}` syntax
 - **Type Safety**: Structured token values with proper TypeScript definitions
 
 ### 🚀 Advanced Processing
-- **TokenScript Integration**: Domain-specific language for complex token computations and transformations
-- **CSS Function Support**: Full support for `clamp()`, `calc()`, `minmax()`, and other CSS functions
-- **Mathematical Operations**: Arithmetic operations, unit conversions, and responsive calculations
-- **Color Manipulation**: Color space conversions, dynamic calculations, and alpha operations
+- **TokenScript Integration**: Best-effort interpretation for resolvable expressions
+- **Safe Fallback Behavior**: Unsupported TokenScript expressions are reported as warnings and keep original token values
+- **CSS Function Preservation**: CSS functions like `clamp()` and `rgba()` are preserved as literal values when not interpreted
+- **Mathematical Operations**: Resolvable arithmetic expressions are interpreted and emitted in `tokens.interpreted.json`
 
 ### 📦 Multiple Output Formats
 - **CSS Variables**: Ready-to-use CSS custom properties
 - **JavaScript ESM**: Tree-shakable ES modules for modern bundlers
 - **TypeScript Definitions**: Full type safety for TypeScript projects
-- **JSON Exports**: Raw, resolved, and interpreted token formats
+- **JSON Exports**: Raw, reference-resolved, and interpreted token formats
 
 ### 🔧 Developer Tools
 - **Interactive Preview**: Web-based token browser with search and filtering
@@ -68,7 +68,7 @@ console.log(tokens.color.primary.bright_cyan.$value);
 
 ## TokenScript Examples
 
-TokenScript enables advanced token computations:
+TokenScript enables advanced token computations when expressions are supported by the interpreter:
 
 ```json
 {
@@ -97,8 +97,12 @@ TokenScript enables advanced token computations:
 │   └── component/base.tokens.json   # Component tokens
 │
 ├── src/
-│   ├── index.ts                     # Build configuration & CLI
-│   └── tokens.ts                    # Token exports (generated)
+│   ├── index.ts                     # CLI entrypoint
+│   ├── build-tokens.ts              # Build pipeline
+│   ├── build-config.ts              # Style Dictionary config builder
+│   ├── token-loader.ts              # Recursive token file discovery/merge
+│   ├── token-reference-resolver.ts  # Reference and interpolation resolver
+│   └── token-validator.ts           # Runtime token validation
 │
 ├── preview/
 │   ├── index.html                   # Interactive token preview
@@ -128,7 +132,7 @@ TokenScript enables advanced token computations:
 │   ├── css/variables.css            # CSS variables
 │   ├── tokens.json                  # Raw tokens
 │   ├── tokens.resolved.json         # Resolved references
-│   ├── tokens.interpreted.json      # TokenScript processed
+│   ├── tokens.interpreted.json      # Best-effort interpreted values (with fallback)
 │   ├── tokens.js                    # JavaScript module
 │   └── tokens.d.ts                  # TypeScript definitions
 │
@@ -212,11 +216,22 @@ All tokens follow the DTCG Design Tokens Format Module:
 Edit JSON files in the `tokens/` directory following the DTCG format.
 
 ### Validation
-All tokens are automatically validated:
+Tokens are validated in the runtime build pipeline and token-management scripts:
 - Required `$value` and `$type` properties
 - Type-specific value format validation
 - Reference resolution
 - Schema compliance
+
+Current compatibility note:
+- Legacy `$type: "spacing"` is accepted and treated as `dimension` with warnings during build.
+
+## Runtime Behavior Notes
+
+- Build uses recursive token discovery for `tokens/**/*.tokens.json`.
+- TokenScript processing is best-effort.
+- If TokenScript cannot interpret an expression (for example some CSS-native function forms), build continues with warnings and original values are preserved for affected tokens.
+- `tokens.resolved.json` contains DTCG-like token objects with `$value` resolved/interpolated where possible.
+- `tokens.interpreted.json` contains interpreted value snapshots and falls back to original values where interpretation is unavailable.
 
 ## Publishing
 
@@ -248,6 +263,13 @@ For NPM publishing, create a GitHub Release which triggers the `publish-npm.yaml
   - Token at path 'color.invalid': invalid color value
 ```
 **Fix**: Use valid color formats like `#000000` or `rgb(0, 0, 0)`
+
+### TokenScript Warnings for CSS Functions
+```
+⚠️  TokenScript interpretation reported issues. Falling back to original values for affected tokens.
+- spacing.fluid: Line 1: Unknown function: 'clamp'
+```
+**Fix**: This is non-fatal by design. Keep CSS-native values as literals, or rewrite the expression to a TokenScript-compatible form.
 
 ### Token References Not Resolving
 ```json

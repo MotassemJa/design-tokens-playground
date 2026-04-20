@@ -25,7 +25,9 @@ npm run build
 
 This generates:
 - `dist/css/variables.css` - CSS variables for use in web projects
-- `dist/tokens.json` - Complete token export in JSON format
+- `dist/tokens.json` - Raw token export in JSON format
+- `dist/tokens.resolved.json` - Reference-resolved token export
+- `dist/tokens.interpreted.json` - Best-effort interpreted token values
 - `dist/tokens.js` - JavaScript module export
 
 ## Project Structure
@@ -38,8 +40,12 @@ This generates:
 │   └── component/base.tokens.json   # Component-level tokens
 │
 ├── src/
-│   ├── index.ts                     # Build configuration (Style Dictionary)
-│   └── tokens.ts                    # Token JavaScript exports
+│   ├── index.ts                     # CLI entrypoint
+│   ├── build-tokens.ts              # Build pipeline
+│   ├── build-config.ts              # Style Dictionary config builder
+│   ├── token-loader.ts              # Recursive token file discovery + merge
+│   ├── token-reference-resolver.ts  # Reference/interpolation resolver
+│   └── token-validator.ts           # Runtime schema validation
 │
 ├── preview/
 │   ├── index.html                   # Interactive token preview app
@@ -68,7 +74,9 @@ This generates:
 ├── dist/                            # Build output (generated)
 │   ├── css/
 │   │   └── variables.css            # CSS variables
-│   ├── tokens.json                  # JSON export
+│   ├── tokens.json                  # Raw JSON export
+│   ├── tokens.resolved.json         # Resolved JSON export
+│   ├── tokens.interpreted.json      # Interpreted JSON export (best-effort)
 │   └── tokens.js                    # JavaScript module
 │
 └── README.md                        # Main project documentation
@@ -119,7 +127,7 @@ $type: "strokeStyle" | "transition" | "typography" | "transform" | "composition"
 
 ## Token Validation
 
-All tokens are automatically validated against the DTCG schema:
+Tokens are validated at build time with runtime checks:
 
 - ✅ Required `$value` property
 - ✅ Valid `$type` values
@@ -127,6 +135,16 @@ All tokens are automatically validated against the DTCG schema:
 - ✅ Reference resolution (e.g., `{color.primary}`)
 - ✅ Color format validation (hex, rgb, hsl)
 - ✅ Duration format validation (ms, s)
+
+Compatibility behavior:
+- Legacy `$type: "spacing"` is accepted and treated as `dimension` with warnings.
+
+## TokenScript Processing Model
+
+- The build runs TokenScript interpretation in best-effort mode.
+- Unsupported expressions are reported as warnings and do not fail the build.
+- For affected tokens, original values are preserved.
+- CSS-native values such as `clamp(...)` and `rgba(...)` can remain as literals when not interpreted.
 
 ### Validation in Action
 
@@ -166,6 +184,11 @@ This creates:
 - **Maintainability**: Update one value, and references update automatically
 - **Flexibility**: Swap implementations without changing dependent tokens
 - **Semantic clarity**: Show intent through references
+
+Reference resolver details:
+- Exact references (`{path.to.token}`) are resolved.
+- Embedded references in strings (for example `1px solid {color.warm-pink}`) are interpolated.
+- Circular references are detected and warned.
 
 ## Using Tokens in Code
 
