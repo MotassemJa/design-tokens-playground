@@ -1,8 +1,17 @@
 name: Update Design Token
 
 on:
-  issues:
-    types: [opened, edited]
+  workflow_call:
+    inputs:
+      issue-number:
+        required: true
+        type: number
+      issue-title:
+        required: true
+        type: string
+      issue-body:
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -11,7 +20,6 @@ permissions:
 
 jobs:
   update-token:
-    if: contains(github.event.issue.labels.*.name, 'token-request') && contains(github.event.issue.labels.*.name, 'update')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -32,13 +40,13 @@ jobs:
         id: parse
         uses: issue-ops/parser@v5
         with:
-          body: ${{ github.event.issue.body }}
+          body: ${{ inputs.issue-body }}
           issue-form-template: update-token.yaml
 
       - name: Create branch for changes
         id: branch
         run: |
-          BRANCH_NAME="token-request/${{ github.event.issue.number }}-update-$(echo '${{ github.event.issue.title }}' | sed 's/\[.*\] //' | tr '[:upper:]' '[:lower:]' | tr ' ' '-' | tr -cd '[:alnum:]-' | head -c 50)"
+          BRANCH_NAME="token-request/${{ inputs.issue-number }}-update-$(echo '${{ inputs.issue-title }}' | sed 's/\[.*\] //' | tr '[:upper:]' '[:lower:]' | tr ' ' '-' | tr -cd '[:alnum:]-' | head -c 50)"
           echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -59,9 +67,9 @@ jobs:
             echo "changes=false" >> $GITHUB_OUTPUT
             echo "No changes to commit"
           else
-            git commit -m "feat(tokens): ${{ github.event.issue.title }}
+            git commit -m "feat(tokens): ${{ inputs.issue-title }}
 
-            Closes #${{ github.event.issue.number }}"
+            Closes #${{ inputs.issue-number }}"
             git push origin "${{ steps.branch.outputs.branch_name }}"
             echo "changes=true" >> $GITHUB_OUTPUT
           fi
@@ -92,12 +100,12 @@ jobs:
 
             **Reviewers**: Please verify the token change is correct before merging.
 
-            Closes #${{ github.event.issue.number }}.`;
+            Closes #${{ inputs.issue-number }}.`;
 
             const pr = await github.rest.pulls.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              title: context.payload.issue.title,
+              title: '${{ inputs.issue-title }}',
               body: prBody,
               head: "${{ steps.branch.outputs.branch_name }}",
               base: context.payload.repository.default_branch,
@@ -106,6 +114,6 @@ jobs:
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              issue_number: context.issue.number,
+              issue_number: ${{ inputs.issue-number }},
               body: `✅ Pull request #${pr.data.number} created with your token changes. Please review it: ${pr.data.html_url}`,
             });

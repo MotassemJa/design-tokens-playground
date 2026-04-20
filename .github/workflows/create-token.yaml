@@ -1,8 +1,20 @@
 name: Create Design Token
 
 on:
-  issues:
-    types: [opened, edited]
+  workflow_call:
+    inputs:
+      issue-number:
+        required: true
+        type: number
+      issue-title:
+        required: true
+        type: string
+      issue-body:
+        required: true
+        type: string
+      issue-action:
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -15,8 +27,7 @@ jobs:
     steps:
       - name: Debug event payload
         run: |
-          echo "Event action: ${{ github.event.action }}"
-          echo "Issue labels: ${{ toJson(github.event.issue.labels) }}"
+          echo "Event action: ${{ inputs.issue-action }}"
 
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -36,13 +47,13 @@ jobs:
         id: parse
         uses: issue-ops/parser@v5
         with:
-          body: ${{ github.event.issue.body }}
+          body: ${{ inputs.issue-body }}
           issue-form-template: create-token.yaml
 
       - name: Create branch for changes
         id: branch
         run: |
-          BRANCH_NAME="token-request/${{ github.event.issue.number }}-$(echo '${{ github.event.issue.title }}' | sed 's/\[.*\] //' | tr '[:upper:]' '[:lower:]' | tr ' ' '-' | tr -cd '[:alnum:]-' | head -c 50)"
+          BRANCH_NAME="token-request/${{ inputs.issue-number }}-$(echo '${{ inputs.issue-title }}' | sed 's/\[.*\] //' | tr '[:upper:]' '[:lower:]' | tr ' ' '-' | tr -cd '[:alnum:]-' | head -c 50)"
           echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -72,9 +83,9 @@ jobs:
               git remote set-url origin https://x-access-token:${ACTIONS_PAT}@github.com/${{ github.repository }}
             fi
 
-            git commit -m "feat(tokens): ${{ github.event.issue.title }}
+            git commit -m "feat(tokens): ${{ inputs.issue-title }}
 
-            Closes #${{ github.event.issue.number }}"
+            Closes #${{ inputs.issue-number }}"
             git push origin "${{ steps.branch.outputs.branch_name }}"
             echo "changes=true" >> $GITHUB_OUTPUT
           fi
@@ -104,12 +115,12 @@ jobs:
 
             **Reviewers**: Please verify the token change is correct before merging.
 
-            Closes #${{ github.event.issue.number }}.`;
+            Closes #${{ inputs.issue-number }}.`;
 
             const pr = await github.rest.pulls.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              title: context.payload.issue.title,
+              title: '${{ inputs.issue-title }}',
               head: '${{ steps.branch.outputs.branch_name }}',
               base: 'main',
               body: prBody
@@ -119,7 +130,7 @@ jobs:
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              issue_number: ${{ github.event.issue.number }},
+              issue_number: ${{ inputs.issue-number }},
               body: `✅ Pull request created: #${pr.data.number}\n\nYour token change is ready for review.`
             });
 
@@ -139,7 +150,7 @@ jobs:
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              issue_number: context.payload.issue.number,
+              issue_number: ${{ inputs.issue-number }},
               body: `⚠️ No changes were made. This could mean:
               - The token already exists with the same value
               - The token path could not be found (for updates/deletes)

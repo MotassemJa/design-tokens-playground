@@ -1,0 +1,110 @@
+name: Token Request Dispatcher
+
+on:
+  issues:
+    types: [opened, edited]
+
+permissions:
+  contents: read
+  issues: write
+  actions: read
+
+concurrency:
+  group: token-request-${{ github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  route:
+    runs-on: ubuntu-latest
+    outputs:
+      action: ${{ steps.route.outputs.action }}
+      valid: ${{ steps.route.outputs.valid }}
+    steps:
+      - name: Route token request
+        id: route
+        shell: bash
+        run: |
+          labels=",${{ join(github.event.issue.labels.*.name, ',') }},"
+
+          has_token_request=false
+          has_create=false
+          has_update=false
+          has_delete=false
+
+          [[ "$labels" == *",token-request,"* ]] && has_token_request=true
+          [[ "$labels" == *",create,"* ]] && has_create=true
+          [[ "$labels" == *",update,"* ]] && has_update=true
+          [[ "$labels" == *",delete,"* ]] && has_delete=true
+
+          action_count=0
+          $has_create && action_count=$((action_count + 1))
+          $has_update && action_count=$((action_count + 1))
+          $has_delete && action_count=$((action_count + 1))
+
+          if ! $has_token_request; then
+            echo "action=none" >> "$GITHUB_OUTPUT"
+            echo "valid=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [[ $action_count -ne 1 ]]; then
+            echo "action=invalid" >> "$GITHUB_OUTPUT"
+            echo "valid=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if $has_create; then
+            echo "action=create" >> "$GITHUB_OUTPUT"
+          elif $has_update; then
+            echo "action=update" >> "$GITHUB_OUTPUT"
+          else
+            echo "action=delete" >> "$GITHUB_OUTPUT"
+          fi
+          echo "valid=true" >> "$GITHUB_OUTPUT"
+
+  invalid-labels:
+    needs: route
+    if: needs.route.outputs.valid == 'false'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Explain invalid labels
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: 'This token request issue must have exactly one action label: create, update, or delete.'
+            });
+
+  create:
+    needs: route
+    if: needs.route.outputs.action == 'create'
+    uses: ./.github/workflows/create-token.yaml
+    with:
+      issue-number: ${{ github.event.issue.number }}
+      issue-title: ${{ github.event.issue.title }}
+      issue-body: ${{ github.event.issue.body }}
+      issue-action: ${{ github.event.action }}
+    secrets: inherit
+
+  update:
+    needs: route
+    if: needs.route.outputs.action == 'update'
+    uses: ./.github/workflows/update-token.yaml
+    with:
+      issue-number: ${{ github.event.issue.number }}
+      issue-title: ${{ github.event.issue.title }}
+      issue-body: ${{ github.event.issue.body }}
+    secrets: inherit
+
+  delete:
+    needs: route
+    if: needs.route.outputs.action == 'delete'
+    uses: ./.github/workflows/delete-token.yaml
+    with:
+      issue-number: ${{ github.event.issue.number }}
+      issue-title: ${{ github.event.issue.title }}
+      issue-body: ${{ github.event.issue.body }}
+    secrets: inherit
