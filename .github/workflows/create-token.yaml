@@ -98,13 +98,13 @@ jobs:
         if: steps.commit.outputs.changes == 'true'
         uses: actions/github-script@v7
         with:
-          github-token: ${{ secrets.ACTIONS_PAT }}
+          github-token: ${{ secrets.ACTIONS_PAT || github.token }}
           script: |
             const tokenData = JSON.parse('${{ steps.parse.outputs.json }}');
 
             const prBody = `## Token Change Request
 
-            This PR was automatically generated from issue #${tokenData.issueNumber}.
+            This PR was automatically generated from issue #${{ inputs.issue-number }}.
 
             ### Details
             - **Action**: CREATE
@@ -150,7 +150,7 @@ jobs:
         if: steps.commit.outputs.changes == 'false'
         uses: actions/github-script@v7
         with:
-          github-token: ${{ secrets.ACTIONS_PAT }}
+          github-token: ${{ secrets.ACTIONS_PAT || github.token }}
           script: |
             await github.rest.issues.createComment({
               owner: context.repo.owner,
