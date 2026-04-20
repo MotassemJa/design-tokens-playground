@@ -20,5 +20,14 @@
     "$value": "#332212",
     "$description": "shitty zwie.",
     "$type": "color"
+  },
+  "brand": {
+    "secondary": {
+      "secondary-gelb": {
+        "$value": "#412213",
+        "$description": "Sekundärfarbe",
+        "$type": "color"
+      }
+    }
   }
 }
