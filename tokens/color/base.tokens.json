@@ -15,5 +15,10 @@
       "$description": "Primary brand color",
       "$type": "color"
     }
+  },
+  "secondary": {
+    "$value": "#332212",
+    "$description": "shitty zwie.",
+    "$type": "color"
   }
 }
