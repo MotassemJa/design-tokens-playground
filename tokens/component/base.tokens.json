@@ -4,8 +4,8 @@
       "primary": {
         "background": {
           "$value": "{semantic.color.interactive.primary}",
-          "$type": "color",
-          "$description": "Primary button background"
+          "$description": "Primary button background",
+          "$type": "color"
         },
         "text": {
           "$value": "{semantic.color.interactive.primary-text}",
