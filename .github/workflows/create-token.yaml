@@ -11,9 +11,13 @@ permissions:
 
 jobs:
   create-token:
-    if: contains(github.event.issue.labels.*.name, 'token-request') && contains(github.event.issue.labels.*.name, 'create')
     runs-on: ubuntu-latest
     steps:
+      - name: Debug event payload
+        run: |
+          echo "Event action: ${{ github.event.action }}"
+          echo "Issue labels: ${{ toJson(github.event.issue.labels) }}"
+
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
