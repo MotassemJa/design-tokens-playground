@@ -130,7 +130,7 @@ body:
           required: true
         - label: The token name follows the naming convention for its layer
           required: true
-        - label: (For non-universal): I am only referencing tokens from the layer directly above mine
+        - label: "(For non-universal): I am only referencing tokens from the layer directly above mine"
           required: true
         - label: The $type value is valid per DTCG spec
           required: true

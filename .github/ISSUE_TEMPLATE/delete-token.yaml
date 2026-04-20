@@ -60,8 +60,8 @@ body:
       placeholder: |
         - Dependent tokens: semantic.color.action.primary references this token
         - Affected components: component.button.primary, component.link
-      validations:
-        required: true
+    validations:
+      required: true
 
   - type: input
     id: replacement
