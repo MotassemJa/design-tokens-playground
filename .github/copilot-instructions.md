@@ -79,3 +79,5 @@ Runtime targets: Node.js 20+, npm 10+ (see README/DEVELOPMENT.md and tsconfig.js
 ---
 
 (Referenced README.md and DEVELOPMENT.md for commands, architecture, and conventions.)
+
+Note: CI workflows may create branches and PRs automatically. If your repository blocks Actions from creating or approving pull requests, maintainers should add a repository secret `ACTIONS_PAT` (Personal Access Token with `repo` scope or equivalent). See README.md → "Publishing" and `.github/workflows/create-token.yaml`.

@@ -58,3 +58,5 @@ You can customize the preview by editing `index.html`:
 - Change colors in the `<style>` section
 - Modify the token loading paths in the `loadTokens()` method
 - Add more token categories in `categories` array
+
+CI note: When token changes are requested via the issue form, workflows may create branches and open PRs automatically. If Actions cannot create PRs due to repository or organization restrictions, add a repository secret named `ACTIONS_PAT` with a personal access token (recommended scope: `repo`). See `README.md` → "Publishing" and `.github/workflows/create-token.yaml` for details.

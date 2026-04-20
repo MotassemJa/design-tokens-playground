@@ -228,6 +228,9 @@ The repository automatically builds and publishes artifacts on every `main` bran
 - **Build Summary**: Detailed statistics and file information in the Actions logs
 
 ### Manual Publishing (Optional)
+
+Note on CI permissions: The automated token workflows under `.github/workflows/` may create branches and open pull requests. If your repository or organization restricts GitHub Actions from creating or approving pull requests, create a repository secret named `ACTIONS_PAT` containing a Personal Access Token (recommended scopes: `repo` — or at minimum `contents`, `pull_requests`, `issues`). The workflows use `ACTIONS_PAT` as a fallback when `GITHUB_TOKEN` lacks permissions. See `.github/workflows/create-token.yaml` and `.github/scripts/create-token.ts` for details.
+
 For NPM publishing, create a GitHub Release which triggers the `publish-npm.yaml` workflow.
 
 ## Token Naming Conventions

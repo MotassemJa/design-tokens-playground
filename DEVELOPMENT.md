@@ -273,6 +273,8 @@ Or live development (tokens loaded from source):
 
 ### Manual Publishing
 
+Note on CI permissions: The automated token workflows may need to push branches and create pull requests on your behalf. If GitHub Actions is not permitted to create PRs in your repository, add a repository secret named `ACTIONS_PAT` containing a personal access token with `repo` scope (or at minimum `contents`, `pull_requests`, `issues`). Workflows will use `ACTIONS_PAT` as a fallback when `GITHUB_TOKEN` is restricted. See `.github/workflows/create-token.yaml` for implementation details.
+
 ```bash
 npm run build
 npm publish
