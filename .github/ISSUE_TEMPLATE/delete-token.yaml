@@ -1,5 +1,5 @@
 name: 🗑️ Delete Token
-description: Request removal of a design token from the 4-layer hierarchy
+description: Request removal of a design token
 title: "[DELETE] "
 labels: ["token-request", "delete"]
 body:
@@ -8,21 +8,17 @@ body:
       value: |
         ## Delete a Design Token
 
-        ⚠️ **Warning**: Deleting tokens may break existing implementations and any tokens in higher layers that reference them. Before submitting:
+        ⚠️ **Warning**: Deleting tokens may break existing implementations and any
+        higher-layer tokens that reference them.
 
-        1. Verify there are no dependent tokens in higher layers
-        2. Notify consuming teams of this change
-        3. Provide a migration path (replacement token if applicable)
-
-        Locate the token using the same namespace + path fields used when it was created.
-
-        See [Token Naming Conventions](../../README.md#token-naming-conventions) for details.
+        Identify the token with the four **Curtis Nathan** groups.
+        Select the hierarchy from the dropdown — do **not** include it in the path.
 
   - type: dropdown
-    id: namespace-level
+    id: hierarchy
     attributes:
-      label: Namespace — Level
-      description: "Hierarchy layer that contains this token."
+      label: Hierarchy
+      description: Which layer does this token belong to?
       options:
         - universal
         - system
@@ -32,53 +28,35 @@ body:
       required: true
 
   - type: input
-    id: namespace-theme
+    id: namespace
     attributes:
-      label: Namespace — Theme
-      description: "Optional theme qualifier. Mainly used for `system` layer tokens."
-      placeholder: "light, dark, high-contrast — or leave empty"
+      label: Namespace (theme / domain)
+      description: Optional theme + domain — do **not** include the hierarchy keyword.
+      placeholder: "light.color"
     validations:
       required: false
 
   - type: input
-    id: namespace-domain
+    id: object
     attributes:
-      label: Namespace — Domain
-      description: "Design domain for this token."
-      placeholder: "color, spacing, typography, size, duration, border, shadow — or a component name"
+      label: Object
+      placeholder: "button.primary"
     validations:
       required: false
 
   - type: input
-    id: object-path
+    id: base
     attributes:
-      label: Object Path
-      description: |
-        Dot-notation group/component/element segments. Optional.
-        Examples: `button`, `button.container`, `forms.input.label`
-      placeholder: "button.container"
-    validations:
-      required: false
-
-  - type: input
-    id: base-path
-    attributes:
-      label: Base Path
-      description: |
-        Dot-notation category/concept/property segments.
-        Examples: `color`, `color.background`, `space.padding`
+      label: Base
       placeholder: "color.background"
     validations:
-      required: true
+      required: false
 
   - type: input
-    id: modifier-path
+    id: modifier
     attributes:
-      label: Modifier Path
-      description: |
-        Dot-notation variant/state/scale/mode segments. Optional.
-        Examples: `primary`, `primary.hover`, `solid.hover.on-light`
-      placeholder: "solid.hover.on-light"
+      label: Modifier
+      placeholder: "hover.on-light"
     validations:
       required: false
 
@@ -86,8 +64,7 @@ body:
     id: reason
     attributes:
       label: Reason for Deletion
-      description: Why should this token be removed?
-      placeholder: "Token is obsolete and has been consolidated into a new design system v2"
+      placeholder: "Token is obsolete and has been consolidated into the new v2 system."
     validations:
       required: true
 
@@ -95,10 +72,10 @@ body:
     id: impact-analysis
     attributes:
       label: Impact Analysis
-      description: What tokens or components depend on this token? Are there any higher-layer tokens that reference it?
+      description: What tokens or components depend on this token?
       placeholder: |
-        - Dependent tokens: semantic.color.action.primary references this token
-        - Affected components: component.button.container, component.nav.item
+        - Dependent tokens: action.color.background.primary
+        - Affected components: button.primary, nav.item
     validations:
       required: true
 
@@ -106,26 +83,24 @@ body:
     id: replacement
     attributes:
       label: Replacement Token (if any)
-      description: What token should be used instead? Must be in the same or lower layer hierarchy.
-      placeholder: "semantic.color.action.primary"
+      placeholder: "action.color.background.primary"
 
   - type: textarea
     id: migration-guide
     attributes:
       label: Migration Guide
-      description: Instructions for teams to migrate away from this token
       placeholder: |
-        Replace all uses of `semantic.color.deprecated.old-primary` with `semantic.color.action.primary`.
-        The visual appearance is identical.
+        Replace uses of `semantic.action.color.background.deprecated` with
+        `semantic.action.color.background.primary`. Visuals are identical.
 
   - type: checkboxes
     id: confirmation
     attributes:
       label: Confirmation
       options:
-        - label: I understand this is a breaking change
+        - label: I understand this is a breaking change.
           required: true
-        - label: I have verified no tokens in higher layers depend on this token
+        - label: I have verified no higher-layer tokens depend on this token.
           required: true
-        - label: I have notified consuming teams and provided a migration path
+        - label: I have notified consuming teams and provided a migration path.
           required: true

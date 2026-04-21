@@ -37,7 +37,9 @@
     "build:watch": "tsx --watch src/index.ts",
     "clean": "rm -rf dist",
     "publish:npm": "npm run build && npm publish",
-    "preview": "npm run build && npx http-server . -p 8000 -o /preview/index.html"
+    "preview": "npm run build && npx http-server . -p 8000 -o /preview/index.html",
+    "test": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --runInBand",
+    "test:watch": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --watch"
   },
   "keywords": [
     "design-tokens",
@@ -66,9 +68,12 @@
   },
   "homepage": "https://github.com/MotassemJa/design-tokens-playground#readme",
   "devDependencies": {
+    "@types/jest": "29.5.14",
     "@types/node": "^25.0.0",
     "@types/yargs": "^17.0.0",
+    "jest": "29.7.0",
     "style-dictionary": "^5.4.0",
+    "ts-jest": "29.4.9",
     "tsx": "^4.0.0",
     "typescript": "^5.0.0",
     "yargs": "^18.0.0"

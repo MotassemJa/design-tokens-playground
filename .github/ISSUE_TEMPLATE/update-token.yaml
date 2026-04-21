@@ -1,5 +1,5 @@
 name: ✏️ Update Existing Token
-description: Request changes to an existing design token while maintaining hierarchy rules
+description: Request changes to an existing design token
 title: "[UPDATE] "
 labels: ["token-request", "update"]
 body:
@@ -8,22 +8,17 @@ body:
       value: |
         ## Update an Existing Design Token
 
-        Specify which token you want to update and the changes needed. Hierarchy inheritance rules are always enforced:
+        Identify the token with the four **Curtis Nathan** groups and provide the new value.
+        Select the hierarchy from the dropdown — do **not** include it in the path.
 
-        - Universal tokens may only hold raw primitive values (no references)
-        - System tokens may only reference `universal.*`
-        - Semantic tokens may only reference `system.*`
-        - Component tokens may only reference `semantic.*`
-
-        Locate the token using the same namespace + path fields used when it was created.
-
-        See [Token Naming Conventions](../../README.md#token-naming-conventions) for details.
+        All segments are **lowercase kebab-case**. Hierarchy rules still apply:
+        universal → (none), system → universal, semantic → system, component → semantic.
 
   - type: dropdown
-    id: namespace-level
+    id: hierarchy
     attributes:
-      label: Namespace — Level
-      description: "Hierarchy layer that contains this token."
+      label: Hierarchy
+      description: Which layer does this token belong to?
       options:
         - universal
         - system
@@ -33,53 +28,35 @@ body:
       required: true
 
   - type: input
-    id: namespace-theme
+    id: namespace
     attributes:
-      label: Namespace — Theme
-      description: "Optional theme qualifier. Mainly used for `system` layer tokens."
-      placeholder: "light, dark, high-contrast — or leave empty"
+      label: Namespace (theme / domain)
+      description: Optional theme + domain — do **not** include the hierarchy keyword.
+      placeholder: "light.color"
     validations:
       required: false
 
   - type: input
-    id: namespace-domain
+    id: object
     attributes:
-      label: Namespace — Domain
-      description: "Design domain for this token."
-      placeholder: "color, spacing, typography, size, duration, border, shadow — or a component name"
+      label: Object
+      placeholder: "button.primary"
     validations:
       required: false
 
   - type: input
-    id: object-path
+    id: base
     attributes:
-      label: Object Path
-      description: |
-        Dot-notation group/component/element segments. Optional.
-        Examples: `button`, `button.container`, `forms.input.label`
-      placeholder: "button.container"
-    validations:
-      required: false
-
-  - type: input
-    id: base-path
-    attributes:
-      label: Base Path
-      description: |
-        Dot-notation category/concept/property segments.
-        Examples: `color`, `color.background`, `space.padding`
+      label: Base
       placeholder: "color.background"
     validations:
-      required: true
+      required: false
 
   - type: input
-    id: modifier-path
+    id: modifier
     attributes:
-      label: Modifier Path
-      description: |
-        Dot-notation variant/state/scale/mode segments. Optional.
-        Examples: `primary`, `primary.hover`, `solid.hover.on-light`
-      placeholder: "solid.hover.on-light"
+      label: Modifier
+      placeholder: "hover.on-light"
     validations:
       required: false
 
@@ -87,8 +64,8 @@ body:
     id: current-value
     attributes:
       label: Current Value
-      description: What is the current value? (helps verify we're updating the right token)
-      placeholder: "#3B82F6 or {system.light.color.brand.primary}"
+      description: Helps verify we are updating the right token.
+      placeholder: "#3B82F6 or {light.color.brand.primary}"
     validations:
       required: true
 
@@ -96,8 +73,8 @@ body:
     id: new-value
     attributes:
       label: New Value
-      description: What should the new value be? Must comply with the inheritance rules for this layer.
-      placeholder: "#2563EB or {system.light.color.brand.secondary}"
+      description: Must follow the inheritance rules for this layer.
+      placeholder: "#2563EB or {light.color.brand.secondary}"
     validations:
       required: true
 
@@ -105,7 +82,6 @@ body:
     id: reason
     attributes:
       label: Reason for Change
-      description: Why does this token need to be updated?
       placeholder: "Accessibility audit found insufficient contrast ratio..."
     validations:
       required: true
@@ -114,11 +90,10 @@ body:
     id: breaking-change
     attributes:
       label: Is this a breaking change?
-      description: Will this change significantly affect existing designs or tokens that reference this one?
       options:
-        - "No - Minor adjustment"
-        - "Yes - Significant visual change"
-        - "Unsure - Needs review"
+        - "No — Minor adjustment"
+        - "Yes — Significant visual change"
+        - "Unsure — Needs review"
     validations:
       required: true
 
@@ -127,9 +102,9 @@ body:
     attributes:
       label: Pre-update Checklist
       options:
-        - label: I understand this change may cascade to tokens in higher layers that reference this token
+        - label: I understand this change may cascade to higher-layer tokens that reference this one.
           required: true
-        - label: "The new value references only tokens from the layer directly above (or is a raw value for universal)"
+        - label: The new value references only tokens from the layer directly above (or is a raw value for `universal`).
           required: true
-        - label: I have verified there are no circular reference issues
+        - label: I have verified there are no circular reference issues.
           required: true

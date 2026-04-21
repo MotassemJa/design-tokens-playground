@@ -62,14 +62,13 @@ jobs:
       - name: Run create token script
         run: |
           npx tsx .github/scripts/create-token.ts \
-            --namespace-level "${{ steps.parse.outputs['parsed_namespace-level'] != '' && fromJson(steps.parse.outputs['parsed_namespace-level'])[0] || '' }}" \
-            --namespace-theme "${{ steps.parse.outputs['parsed_namespace-theme'] }}" \
-            --namespace-domain "${{ steps.parse.outputs['parsed_namespace-domain'] }}" \
-            --object-path "${{ steps.parse.outputs['parsed_object-path'] }}" \
-            --base-path "${{ steps.parse.outputs['parsed_base-path'] }}" \
-            --modifier-path "${{ steps.parse.outputs['parsed_modifier-path'] }}" \
+            --hierarchy "${{ steps.parse.outputs.parsed_hierarchy }}" \
+            --namespace "${{ steps.parse.outputs.parsed_namespace }}" \
+            --object "${{ steps.parse.outputs.parsed_object }}" \
+            --base "${{ steps.parse.outputs.parsed_base }}" \
+            --modifier "${{ steps.parse.outputs.parsed_modifier }}" \
             --token-type "${{ steps.parse.outputs['parsed_token-type'] }}" \
-            --value "${{ steps.parse.outputs.parsed_token-value }}" \
+            --value "${{ steps.parse.outputs['parsed_token-value'] }}" \
             --description "${{ steps.parse.outputs.parsed_description }}"
 
       - name: Commit and push changes
@@ -108,8 +107,12 @@ jobs:
 
             ### Details
             - **Action**: CREATE
-            - **Namespace**: ${tokenData['namespace-level'] || tokenData['hierarchy-level'] || 'N/A'} / ${tokenData['namespace-theme'] || '-'} / ${tokenData['namespace-domain'] || tokenData.domain || tokenData.category || 'N/A'}
-            - **Object Path**: ${tokenData['object-path'] || tokenData['token-name'] || tokenData['token-path'] || 'N/A'}
+            - **Namespace**: ${tokenData.namespace || 'N/A'}
+            - **Object**: ${tokenData.object || '-'}
+            - **Base**: ${tokenData.base || '-'}
+            - **Modifier**: ${tokenData.modifier || '-
+            - **Base**: ${tokenData.base || '-'}
+            - **Modifier**: ${tokenData.modifier || '-'}
             ${tokenData['token-value'] ? `- **Value**: \`${tokenData['token-value']}\`` : ''}
             ${tokenData['token-type'] ? `- **Type**: \`${tokenData['token-type']}\`` : ''}
 

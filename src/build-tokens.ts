@@ -2,7 +2,7 @@ import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import StyleDictionary from "style-dictionary";
 import { builders, processTokens } from "@tokens-studio/tokenscript-interpreter";
-import { TokenLoader } from "./token-loader.js";
+import { TokenLoader, type Hierarchy } from "./token-loader.js";
 import { TokenReferenceResolver } from "./token-reference-resolver.js";
 import { TokenValidator, type TokenGroup } from "./token-validator.js";
 import { BuildConfig, type BuildOptions } from "./build-config.js";
@@ -174,21 +174,14 @@ export async function buildTokens(options: BuildOptions = {}) {
 
   console.log("🔨 Building design tokens...");
 
-  // Load and merge source tokens
+  // Load source tokens — by hierarchy for validation, merged for build
+  const tokensByHierarchy = tokenLoader.loadTokensByHierarchy();
   const allTokens = tokenLoader.loadTokens();
   const validator = new TokenValidator();
 
-  if (!validator.validate(allTokens as TokenGroup)) {
+  if (!validator.validate(tokensByHierarchy as Map<Hierarchy, TokenGroup>)) {
     const errors = validator.getErrors().map((error) => `- ${error}`).join("\n");
     throw new Error(`Token validation failed:\n${errors}`);
-  }
-
-  // Validate cross-layer hierarchy
-  validator.validateHierarchy(allTokens as TokenGroup);
-  const hierarchyErrors = validator.getErrors();
-  if (hierarchyErrors.length > 0) {
-    const errors = hierarchyErrors.map((error) => `- ${error}`).join("\n");
-    throw new Error(`Token hierarchy validation failed:\n${errors}`);
   }
 
   const warnings = validator.getWarnings();

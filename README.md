@@ -12,17 +12,17 @@ The repository is intentionally small so the build, validation, and workflow beh
 
 ### Color chain
 
-1. `universal.color.blue`
-2. `system.light.color.brand.primary` -> `{universal.color.blue}`
-3. `semantic.color.interactive.primary` -> `{system.light.color.brand.primary}`
-4. `component.button.primary.background` -> `{semantic.color.interactive.primary}`
+1. `universal.color.blue.500`
+2. `system.light.color.brand.primary` -> `{universal.color.blue.500}`
+3. `semantic.action.color.background.primary` -> `{system.light.color.brand.primary}`
+4. `component.button.primary.color.background` -> `{semantic.action.color.background.primary}`
 
 ### Spacing chain
 
-1. `universal.spacing.16`
-2. `system.spacing.component.button.padding-horizontal` -> `{universal.spacing.16}`
-3. `semantic.spacing.component.button.padding` -> `{system.spacing.component.button.padding-horizontal}`
-4. `component.button.primary.padding` -> `{semantic.spacing.component.button.padding}`
+1. `universal.space.scale.200`
+2. `system.light.space.button.padding.horizontal` -> `{universal.space.scale.200}`
+3. `semantic.action.space.padding.default` -> `{system.light.space.button.padding.horizontal}`
+4. `component.button.primary.space.padding` -> `{semantic.action.space.padding.default}`
 
 ## Commands
 
@@ -40,6 +40,7 @@ npm run build:js-only
 npm run build:types-only
 npm run build:watch
 npm run clean
+npm test
 ```
 
 ### CLI flags
@@ -69,18 +70,10 @@ npm run build -- --no-references
 
 ```text
 tokens/
-  universal/
-    base.colors.tokens.json
-    base.spacing.tokens.json
-    base.typography.tokens.json
-  system/
-    theme.colors.tokens.json
-    theme.spacing.tokens.json
-  semantic/
-    colors.tokens.json
-    spacing.tokens.json
-  component/
-    base.tokens.json
+  universal/tokens.json
+  system/tokens.json
+  semantic/tokens.json
+  component/tokens.json
 
 src/
   index.ts
@@ -90,20 +83,53 @@ src/
   token-reference-resolver.ts
   token-validator.ts
 
+tests/
+  fixtures/
+    valid/                  # happy-path fixture (all 4 layers)
+    invalid-naming/         # breaks Curtis Nathan kebab-case rule
+    invalid-hierarchy/      # universal token referencing another layer
+    invalid-reference/      # unresolved {path.to.token}
+  token-loader.test.ts
+  token-validator.test.ts
+  token-pipeline.test.ts
+
 .github/scripts/
   token-common.ts
-  token-validator.ts
   create-token.ts
   update-token.ts
   delete-token.ts
 ```
 
+## Token Naming — Curtis Nathan convention
+
+Every token path has four group slots:
+
+```
+{namespace}.{object}.{base}.{modifier}
+```
+
+| Group      | What it captures                                   | Example                         |
+| ---------- | -------------------------------------------------- | ------------------------------- |
+| namespace  | hierarchy level + optional theme + optional domain | `system.light.color`            |
+| object     | group / component / element                        | `button.primary`                |
+| base       | category / concept / property                      | `color.background`              |
+| modifier   | variant / state / scale / mode                     | `hover.on-light` or _(empty)_   |
+
+- Every segment must be **lowercase kebab-case** (`on-brand`, `primary-text`, `500`).
+- The first segment (from `namespace`) must be one of `universal`, `system`, `semantic`, `component`.
+- References may only point one layer up:
+  universal → (none), system → universal, semantic → system, component → semantic.
+
+Validation is enforced at build time (`npm run build`) and by the Jest suite
+(`npm test`). Issue forms under `.github/ISSUE_TEMPLATE/` only ask for the four
+group fields — see the inline examples in each form for guidance.
+
 ## What This Repository Does
 
-- Loads and merges `tokens/**/*.tokens.json`
-- Validates DTCG structure and layer hierarchy
-- Runs best-effort TokenScript interpretation
-- Resolves token references for resolved JSON output
+- Loads and merges `tokens/{universal,system,semantic,component}/tokens.json`
+- Validates Curtis Nathan naming + 4-layer hierarchy references
+- Runs TokenScript (`@tokens-studio/tokenscript-interpreter`) for value interpretation and validation
+- Resolves token references for the resolved JSON output
 - Builds CSS, JS, and TypeScript outputs via Style Dictionary
 
 ## What This Repository Does Not Try To Do

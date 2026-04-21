@@ -55,13 +55,12 @@ jobs:
       - name: Run update token script
         run: |
           npx tsx .github/scripts/update-token.ts \
-            --namespace-level "${{ steps.parse.outputs['parsed_namespace-level'] != '' && fromJson(steps.parse.outputs['parsed_namespace-level'])[0] || '' }}" \
-            --namespace-theme "${{ steps.parse.outputs['parsed_namespace-theme'] }}" \
-            --namespace-domain "${{ steps.parse.outputs['parsed_namespace-domain'] }}" \
-            --object-path "${{ steps.parse.outputs['parsed_object-path'] }}" \
-            --base-path "${{ steps.parse.outputs['parsed_base-path'] }}" \
-            --modifier-path "${{ steps.parse.outputs['parsed_modifier-path'] }}" \
-            --value "${{ steps.parse.outputs.parsed_new-value }}"
+            --hierarchy "${{ steps.parse.outputs.parsed_hierarchy }}" \
+            --namespace "${{ steps.parse.outputs.parsed_namespace }}" \
+            --object "${{ steps.parse.outputs.parsed_object }}" \
+            --base "${{ steps.parse.outputs.parsed_base }}" \
+            --modifier "${{ steps.parse.outputs.parsed_modifier }}" \
+            --value "${{ steps.parse.outputs['parsed_new-value'] }}"
 
       - name: Commit and push changes
         id: commit
@@ -148,8 +147,12 @@ jobs:
 
             ### Details
             - **Action**: UPDATE
-            - **Namespace**: ${tokenData['namespace-level'] || tokenData['hierarchy-level'] || 'N/A'} / ${tokenData['namespace-theme'] || '-'} / ${tokenData['namespace-domain'] || tokenData.domain || tokenData.category || 'N/A'}
-            - **Object Path**: ${tokenData['object-path'] || tokenData['token-path'] || 'N/A'}
+            - **Namespace**: ${tokenData.namespace || 'N/A'}
+            - **Object**: ${tokenData.object || '-'}
+            - **Base**: ${tokenData.base || '-'}
+            - **Modifier**: ${tokenData.modifier || '-
+            - **Base**: ${tokenData.base || '-'}
+            - **Modifier**: ${tokenData.modifier || '-'}
             - **Current Value**: \`${tokenData['current-value']}\`
             - **New Value**: \`${tokenData['new-value']}\`
             - **Breaking Change**: ${tokenData['breaking-change'] || 'Not specified'}

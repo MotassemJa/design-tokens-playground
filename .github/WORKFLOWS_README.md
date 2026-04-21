@@ -180,8 +180,8 @@ All three token workflows are **reusable workflows** and receive inputs from the
 │   ├── create-token.yaml                # Reusable: create token
 │   ├── update-token.yaml                # Reusable: update token
 │   ├── delete-token.yaml                # Reusable: delete token
-│   ├── build-tokens.yaml                # Independent: CI build
-│   └── publish-npm.yaml                 # Independent: publish to npm
+│   ├── build-tokens.yaml                # Independent: CI test + build
+│   └── publish-npm.yaml                 # Independent: test + build + publish to npm
 ├── ISSUE_TEMPLATE/
 │   ├── create-token.yaml                # Form: create token issue
 │   ├── update-token.yaml                # Form: update token issue
@@ -210,3 +210,8 @@ All three token workflows are **reusable workflows** and receive inputs from the
 - **Token Validation**: `.github/scripts/token-validator.ts`
 - **Build Pipeline**: `.github/workflows/build-tokens.yaml`
 - **Publishing**: `.github/workflows/publish-npm.yaml`
+
+## CI Stages
+
+- `build-tokens.yaml` installs dependencies, runs `npm test`, then runs `npm run build` before uploading artifacts or deploying Pages.
+- `publish-npm.yaml` installs dependencies, runs `npm test`, then runs `npm run build` before publishing to npm.

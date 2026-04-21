@@ -5,12 +5,26 @@ on:
     branches: [main]
     paths:
       - 'tokens/**'
-      - 'config.json'
+      - 'src/**'
+      - 'tests/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tsconfig.json'
+      - 'tsconfig.test.json'
+      - 'jest.config.cjs'
+      - '.github/workflows/build-tokens.yaml'
   pull_request:
     branches: [main]
     paths:
       - 'tokens/**'
-      - 'config.json'
+      - 'src/**'
+      - 'tests/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tsconfig.json'
+      - 'tsconfig.test.json'
+      - 'jest.config.cjs'
+      - '.github/workflows/build-tokens.yaml'
 
 permissions:
   contents: read
@@ -34,6 +48,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Run tests
+        run: npm test
 
       - name: Build tokens
         run: npm run build
@@ -181,6 +198,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Run tests
+        run: npm test
 
       - name: Build tokens and preview
         run: npm run build

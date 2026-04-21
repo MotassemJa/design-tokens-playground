@@ -8,89 +8,74 @@ body:
       value: |
         ## Create a New Design Token
 
-        Design tokens follow a 4-layer hierarchy with a structured naming convention.
+        All tokens follow the **Curtis Nathan naming convention**, composed of four
+        group fields:
 
-        **Hierarchy rules:**
-        - **Layer 1 — Universal**: Primitive values only. No references. (`universal.*`)
-        - **Layer 2 — System**: Theme-aware tokens. References `universal.*` only. (`system.[theme].*`)
-        - **Layer 3 — Semantic**: Intent-driven tokens. References `system.*` only. (`semantic.*`)
-        - **Layer 4 — Component**: UI component styles. References `semantic.*` only. (`component.*`)
-
-        **Token name anatomy:**
         ```
-        --ds [.theme] [.domain] [.object-path] [.base-path] [.modifier-path]
+        {namespace}.{object}.{base}.{modifier}
         ```
-        Example: `--ds.button.container.color.background.solid.hover.on-light`
 
-        See [Token Naming Conventions](../../README.md#token-naming-conventions) for the full reference.
+        | Group      | What it captures                                   | Example                         |
+        | ---------- | -------------------------------------------------- | ------------------------------- |
+        | namespace  | hierarchy level + optional theme + optional domain | `system.light.color`            |
+        | object     | group / component / element being styled           | `button.primary.text`           |
+        | base       | category / concept / property                      | `color` or `space.padding`      |
+        | modifier   | variant / state / scale / mode                     | `hover.on-light` or _(empty)_   |
 
-  - type: dropdown
-    id: namespace-level
+        **Rules**
+        - Every segment is **lowercase kebab-case** (`on-brand`, `primary-text`).
+        - The `namespace` field must start with one of: `universal`, `system`, `semantic`, `component`.
+        - Hierarchy references are one-layer-up only:
+          universal → (none), system → universal, semantic → system, component → semantic.
+        - `universal` tokens hold raw primitive values (no `{ref}`).
+
+        **Good examples**
+        - `universal.color.blue.500` → `#3B82F6`
+        - `system.light.color.brand.primary` → `{universal.color.blue.500}`
+        - `semantic.action.color.background.primary` → `{system.light.color.brand.primary}`
+        - `component.button.primary.color.background` → `{semantic.action.color.background.primary}`
+
+        > Only fill in the four group fields below. Leave unused groups empty — the
+        > build pipeline (TokenScript + validator) will reject malformed paths.
+
+  - type: input
+    id: namespace
     attributes:
-      label: Namespace — Level
-      description: "Choose the hierarchy layer for this token."
-      options:
-        - universal
-        - system
-        - semantic
-        - component
+      label: Namespace
+      description: |
+        Hierarchy level + optional theme + optional domain, joined by `.`.
+        **Required.** First segment must be `universal`, `system`, `semantic`, or `component`.
+      placeholder: "system.light.color"
     validations:
       required: true
 
   - type: input
-    id: namespace-theme
+    id: object
     attributes:
-      label: Namespace — Theme
-      description: "Optional theme qualifier. Mainly used for `system` layer tokens."
-      placeholder: "light, dark, high-contrast — or leave empty"
-    validations:
-      required: false
-
-  - type: input
-    id: namespace-domain
-    attributes:
-      label: Namespace — Domain
-      description: "Design domain for this token."
-      placeholder: "color, spacing, typography, size, duration, border, shadow — or a component name"
-    validations:
-      required: false
-
-  - type: input
-    id: object-path
-    attributes:
-      label: Object Path
+      label: Object
       description: |
-        Dot-notation path for the group, component, and/or element segments. Optional.
-        - `button` — just a component
-        - `button.container` — component + element
-        - `forms.input.label` — group + component + element
-      placeholder: "button.container"
+        Group / component / element that the token applies to. Optional.
+      placeholder: "button.primary"
     validations:
       required: false
 
   - type: input
-    id: base-path
+    id: base
     attributes:
-      label: Base Path
+      label: Base
       description: |
-        Dot-notation path for the category, concept, and/or property segments.
-        - `color` — category only
-        - `color.background` — category + property
-        - `space.padding` — category + property
+        Category / concept / property being styled. Optional, but strongly recommended.
       placeholder: "color.background"
     validations:
-      required: true
+      required: false
 
   - type: input
-    id: modifier-path
+    id: modifier
     attributes:
-      label: Modifier Path
+      label: Modifier
       description: |
-        Dot-notation path for variant, state, scale, and/or mode. Optional.
-        - `primary` — variant only
-        - `primary.hover` — variant + state
-        - `solid.hover.on-light` — variant + state + mode
-      placeholder: "solid.hover.on-light"
+        Variant / state / scale / mode. Optional.
+      placeholder: "hover.on-light"
     validations:
       required: false
 
@@ -99,14 +84,13 @@ body:
     attributes:
       label: Token Value
       description: |
-        The value for this token. Use `{path.to.token}` syntax for references.
+        Raw value, or `{path.to.token}` reference to the layer one step above.
 
-        **By layer:**
         - Universal: raw value only — `#3B82F6`, `1rem`, `700`
         - System: reference to universal — `{universal.color.blue.500}`
         - Semantic: reference to system — `{system.light.color.brand.primary}`
-        - Component: reference to semantic — `{semantic.color.action.primary}`
-      placeholder: "#3B82F6 or {semantic.color.action.primary}"
+        - Component: reference to semantic — `{semantic.action.color.background.primary}`
+      placeholder: "#3B82F6 or {semantic.action.color.background.primary}"
     validations:
       required: true
 
@@ -115,7 +99,7 @@ body:
     attributes:
       label: Token Type
       description: "DTCG `$type` for this token."
-      placeholder: "color, dimension, fontSize, fontWeight, duration, border, shadow, opacity, …"
+      placeholder: "color, dimension, fontFamily, fontWeight, duration, …"
     validations:
       required: true
 
@@ -123,31 +107,21 @@ body:
     id: description
     attributes:
       label: Description
-      description: Explain the purpose and intended use of this token.
-      placeholder: "Primary brand color used for main CTAs and interactive elements"
+      description: What does this token represent and when should it be used?
+      placeholder: "Primary brand background color for main CTAs."
     validations:
       required: true
-
-  - type: textarea
-    id: usage-examples
-    attributes:
-      label: Usage Examples
-      description: Where and how should this token be used?
-      placeholder: |
-        - Primary buttons background
-        - Active navigation item highlight
-        - Link text color
 
   - type: checkboxes
     id: confirmation
     attributes:
       label: Pre-submission Checklist
       options:
-        - label: I have checked that this token does not already exist in its layer
+        - label: The `namespace` field starts with a valid hierarchy (`universal` / `system` / `semantic` / `component`).
           required: true
-        - label: The namespace, object, base, and modifier paths follow the naming conventions
+        - label: All segments in every group are lowercase `kebab-case`.
           required: true
-        - label: "The `$value` references only tokens from the layer directly above (or is a raw value for universal)"
+        - label: The `$value` references only tokens from the layer directly above (or is a raw value for `universal`).
           required: true
-        - label: "The `$type` value is valid per the DTCG spec"
+        - label: The `$type` is a valid DTCG type.
           required: true

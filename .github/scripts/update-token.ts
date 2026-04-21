@@ -1,97 +1,30 @@
 #!/usr/bin/env node
-
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 import { updateToken, type TokenData } from "./token-common.ts";
 
-/**
- * CLI argument parser for token update requests.
- */
 const argv = await yargs(hideBin(process.argv))
-  .option("namespace-level", {
-    type: "string",
-    description: "Namespace level (universal, system, semantic, component)",
-  })
-  .option("namespace-theme", {
-    type: "string",
-    description: "Namespace theme for system level (light, dark, high-contrast)",
-  })
-  .option("namespace-domain", {
-    type: "string",
-    description: "Namespace domain (color, spacing, typography, etc.)",
-  })
-  .option("object-path", {
-    alias: "o",
-    type: "string",
-    description: "Object path: group.component.element (dot notation, optional)",
-  })
-  .option("base-path", {
-    alias: "b",
-    type: "string",
-    description: "Base path: category.concept.property (dot notation)",
-  })
-  .option("modifier-path", {
-    alias: "x",
-    type: "string",
-    description: "Modifier path: variant.state.scale.mode (dot notation, optional)",
-  })
-  .option("hierarchy-level", {
-    alias: "l",
-    type: "string",
-    description: "Hierarchy level (universal, system, semantic, component)",
-  })
-  .option("domain", {
-    alias: "m",
-    type: "string",
-    description: "Token domain/category",
-  })
-  .option("category", {
-    alias: "c",
-    type: "string",
-    description: "Legacy token category",
-  })
-  .option("token-path", {
-    alias: "p",
-    type: "string",
-    description: "Full token path to update",
-  })
-  .option("value", {
-    alias: "v",
-    type: "string",
-    description: "Token value",
-    demandOption: true,
-  })
-  .option("description", {
-    alias: "d",
-    type: "string",
-    description: "Token description",
-  })
-  .check((args) => {
-    if (!args["token-path"] && !args["object-path"]) {
-      throw new Error("Provide --object-path (or legacy --token-path)");
-    }
-    return true;
-  })
+  .option("hierarchy", { type: "string", demandOption: true })
+  .option("namespace", { type: "string" })
+  .option("object", { type: "string" })
+  .option("base", { type: "string" })
+  .option("modifier", { type: "string" })
+  .option("value", { type: "string", description: "New token value", demandOption: true })
+  .option("token-type", { type: "string" })
+  .option("description", { type: "string" })
   .strict()
   .parseAsync();
 
-/**
- * Normalized payload passed to shared token update logic.
- */
-const tokenData: TokenData = {
+const data: TokenData = {
   action: "update",
-  category: argv.category,
-  namespaceLevel: argv["namespace-level"],
-  namespaceTheme: argv["namespace-theme"],
-  namespaceDomain: argv["namespace-domain"],
-  objectPath: argv["object-path"],
-  basePath: argv["base-path"],
-  modifierPath: argv["modifier-path"],
-  hierarchyLevel: argv["hierarchy-level"],
-  domain: argv.domain,
-  tokenPath: argv["token-path"],
+  hierarchy: argv.hierarchy as TokenData["hierarchy"],
+  namespace: argv.namespace,
+  object: argv.object,
+  base: argv.base,
+  modifier: argv.modifier,
   value: argv.value,
+  tokenType: argv["token-type"],
   description: argv.description,
 };
 
-updateToken(tokenData);
+updateToken(data);
