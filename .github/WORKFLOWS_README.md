@@ -207,7 +207,7 @@ All three token workflows are **reusable workflows** and receive inputs from the
 ## Related Documentation
 
 - **Token Schema**: See `tokens/` directory and `README.md`
-- **Token Validation**: `.github/scripts/token-validator.ts`
+- **Token Validation**: `src/token-validator.ts` (used by build pipeline and `.github/scripts/token-common.ts`)
 - **Build Pipeline**: `.github/workflows/build-tokens.yaml`
 - **Publishing**: `.github/workflows/publish-npm.yaml`
 

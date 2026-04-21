@@ -74,9 +74,9 @@ export class BuildConfig {
   }
 
   /**
-    * Creates the JavaScript ESM output platform.
-    *
-    * @returns Style Dictionary platform config for `dist/tokens.js`.
+   * Creates the JavaScript ESM output platform.
+   *
+   * @returns Style Dictionary platform config for `dist/tokens.js`.
    */
   createJsPlatform(): PlatformConfig {
     const jsFileConfig: File = {
@@ -94,9 +94,9 @@ export class BuildConfig {
   }
 
   /**
-    * Creates the TypeScript declaration output platform.
-    *
-    * @returns Style Dictionary platform config for `dist/tokens.d.ts`.
+   * Creates the TypeScript declaration output platform.
+   *
+   * @returns Style Dictionary platform config for `dist/tokens.d.ts`.
    */
   createTsPlatform(): PlatformConfig {
     const tsFileConfig: File = {
@@ -114,10 +114,10 @@ export class BuildConfig {
   }
 
   /**
-    * Creates the full Style Dictionary config object for the active run.
-    *
-    * @param tokens Token tree to pass into Style Dictionary.
-    * @returns Full Style Dictionary config with enabled platforms.
+   * Creates the full Style Dictionary config object for the active run.
+   *
+   * @param tokens Token tree to pass into Style Dictionary.
+   * @returns Full Style Dictionary config with enabled platforms.
    */
   createConfig(tokens: Record<string, unknown>): Config {
     const platforms: Record<string, PlatformConfig> = {};

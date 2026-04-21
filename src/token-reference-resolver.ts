@@ -19,7 +19,7 @@ export class TokenReferenceResolver {
   }
 
   /**
-    * Recursively resolves references in primitive values, arrays, and objects.
+   * Recursively resolves references in primitive values, arrays, and objects.
    */
   private resolveValue(value: unknown, path: string[] = [], stack: string[] = []): unknown {
     if (typeof value === "string") {
@@ -66,9 +66,9 @@ export class TokenReferenceResolver {
   }
 
   /**
-    * Resolves a single reference path against the loaded token tree.
-    *
-    * Circular and unresolved references are preserved in original form.
+   * Resolves a single reference path against the loaded token tree.
+   *
+   * Circular and unresolved references are preserved in original form.
    */
   private resolveReference(refPath: string, currentPath: string[], stack: string[]): unknown {
     if (stack.includes(refPath)) {
