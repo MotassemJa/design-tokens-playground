@@ -39,6 +39,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -48,6 +50,16 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Build base branch tokens (before)
+        if: github.event_name == 'pull_request'
+        run: |
+          git stash --include-untracked || true
+          git checkout ${{ github.base_ref }}
+          npm run build -- --no-css --no-js --no-types 2>/dev/null || npm run build
+          cp dist/tokens.json /tmp/tokens-before.json
+          git checkout -
+          git stash pop || true
 
       - name: Run tests
         run: npm test
@@ -71,56 +83,79 @@ jobs:
           path: dist/
           retention-days: 30
 
-      - name: Comment build preview on PR
+      - name: Comment token diff on PR
         if: github.event_name == 'pull_request'
         uses: actions/github-script@v9
         with:
           script: |
             const fs = require('fs');
-            const path = require('path');
-            
-            // Read a sample of built tokens for preview
-            let cssPreview = '';
-            const cssPath = 'dist/css/variables.css';
-            if (fs.existsSync(cssPath)) {
-              const content = fs.readFileSync(cssPath, 'utf8');
-              const lines = content.split('\n').slice(0, 30);
-              cssPreview = lines.join('\n');
-              if (content.split('\n').length > 30) {
-                cssPreview += '\n/* ... truncated ... */';
+
+            function flattenTokens(obj, prefix = '') {
+              const result = {};
+              for (const [key, val] of Object.entries(obj)) {
+                const path = prefix ? `${prefix}.${key}` : key;
+                if (val && typeof val === 'object' && '$value' in val) {
+                  result[path] = val['$value'];
+                } else if (val && typeof val === 'object') {
+                  Object.assign(result, flattenTokens(val, path));
+                }
+              }
+              return result;
+            }
+
+            const afterPath = 'dist/tokens.json';
+            const beforePath = '/tmp/tokens-before.json';
+
+            const after = flattenTokens(JSON.parse(fs.readFileSync(afterPath, 'utf8')));
+            const before = fs.existsSync(beforePath)
+              ? flattenTokens(JSON.parse(fs.readFileSync(beforePath, 'utf8')))
+              : {};
+
+            const added = [];
+            const removed = [];
+            const changed = [];
+
+            const allKeys = new Set([...Object.keys(before), ...Object.keys(after)]);
+            for (const key of [...allKeys].sort()) {
+              if (!(key in before)) {
+                added.push(`+ \`${key}\`: \`${after[key]}\``);
+              } else if (!(key in after)) {
+                removed.push(`- \`${key}\``);
+              } else if (before[key] !== after[key]) {
+                changed.push(`~ \`${key}\`: \`${before[key]}\` → \`${after[key]}\``);
               }
             }
-            
-            const comment = `## 🎨 Token Build Preview
-            
-            Build completed successfully! Here's a preview of the generated CSS variables:
-            
-            \`\`\`css
-            ${cssPreview || 'No CSS output generated'}
-            \`\`\`
-            
-            <details>
-            <summary>📦 All generated formats</summary>
-            
-            - CSS Variables (\`build/css/\`)
-            - JavaScript/TypeScript (\`build/js/\`)
-            - JSON (\`build/json/\`)
-            - SCSS (\`build/scss/\`)
-            
-            </details>`;
-            
-            // Find existing comment to update
+
+            const totalChanged = added.length + removed.length + changed.length;
+            let diffBody = '';
+
+            if (totalChanged === 0) {
+              diffBody = '_No token value changes detected._';
+            } else {
+              if (changed.length) diffBody += `### Modified (${changed.length})\n${changed.join('\n')}\n\n`;
+              if (added.length)   diffBody += `### Added (${added.length})\n${added.join('\n')}\n\n`;
+              if (removed.length) diffBody += `### Removed (${removed.length})\n${removed.join('\n')}\n\n`;
+            }
+
+            const comment = [
+              '## 🎨 Token Build Preview',
+              '',
+              `Build completed successfully. **${totalChanged}** token(s) changed.`,
+              '',
+              diffBody.trim(),
+            ].join('\n');
+
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.payload.pull_request.number
             });
-            
-            const botComment = comments.find(c => 
-              c.user.login === 'github-actions[bot]' && 
+
+            const botComment = comments.find(c =>
+              c.user.login === 'github-actions[bot]' &&
               c.body.includes('Token Build Preview')
             );
-            
+
             if (botComment) {
               await github.rest.issues.updateComment({
                 owner: context.repo.owner,
