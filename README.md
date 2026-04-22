@@ -200,6 +200,16 @@ npm run preview
 
 This builds first, then serves `preview/index.html` and reads from `dist/tokens.resolved.json`.
 
+## TokenScript Schema Examples
+
+Example schema specs for extending TokenScript with `oklch(...)` and a safe
+`clamp_string(...)` helper are available in:
+
+- `examples/tokenscript-schemas/`
+
+These are reference examples and are not auto-registered by this repository's
+runtime pipeline.
+
 ## Automation
 
 GitHub workflows in `.github/workflows/` support create, update, and delete token requests via issue templates and helper scripts under `.github/scripts/`.
