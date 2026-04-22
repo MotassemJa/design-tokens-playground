@@ -1,231 +1,258 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import {
+  ALLOWED_HIERARCHIES,
+  TOKEN_FILENAME,
+  TOKENS_ROOT,
+  type Hierarchy,
+} from "../../src/token-loader.ts";
+import { TokenValidator, type TokenGroup } from "../../src/token-validator.ts";
 
-export interface TokenValue {
-  $value: string | number | object | boolean;
-  $description?: string;
+export interface TokenLeaf {
+  $value: unknown;
   $type?: string;
+  $description?: string;
 }
 
-export interface TokenObject {
-  [key: string]: TokenValue | TokenObject;
+export interface TokenTree {
+  [key: string]: TokenLeaf | TokenTree;
 }
 
+/**
+ * Input payload from issue-form / CLI.
+ */
 export interface TokenData {
   action: "create" | "update" | "delete";
-  category: string;
-  name?: string;
-  group?: string;
-  tokenPath?: string;
+  hierarchy: Hierarchy;
+  namespace?: string;
+  object?: string;
+  base?: string;
+  modifier?: string;
   value?: string;
+  tokenType?: string;
   description?: string;
 }
 
-const TOKENS_DIR = join(process.cwd(), "tokens");
+const TOKENS_DIR = join(process.cwd(), TOKENS_ROOT);
 
-export function parseTokenValue(value: string): TokenValue {
+/**
+ * Assembles a Curtis Nathan path from the group fields (no hierarchy prefix).
+ */
+export function buildTokenPath(data: TokenData): string {
+  const parts = [data.namespace, data.object, data.base, data.modifier]
+    .map((p) => (p ?? "").trim())
+    .filter((p) => p.length > 0);
+  return parts.join(".");
+}
+
+/**
+ * Returns the validated hierarchy for a TokenData payload.
+ */
+export function getHierarchy(data: TokenData): Hierarchy {
+  const rawHierarchy = String(data.hierarchy ?? "").trim();
+  const normalizedHierarchy = rawHierarchy
+    .replace(/^\[+/, "")
+    .replace(/\]+$/, "")
+    .trim()
+    .toLowerCase() as Hierarchy;
+
+  if (!ALLOWED_HIERARCHIES.includes(normalizedHierarchy)) {
+    throw new Error(
+      `Invalid hierarchy '${rawHierarchy}'. Allowed: ${ALLOWED_HIERARCHIES.join(", ")}`
+    );
+  }
+  return normalizedHierarchy;
+}
+
+/**
+ * Returns the single `tokens/{hierarchy}/tokens.json` file path.
+ */
+export function getTokenFilePath(hierarchy: Hierarchy): string {
+  const dir = join(TOKENS_DIR, hierarchy);
+  if (!existsSync(dir)) {
+    mkdirSync(dir, { recursive: true });
+  }
+  return join(dir, TOKEN_FILENAME);
+}
+
+export function readTokenFile(filePath: string): TokenTree {
+  if (!existsSync(filePath)) return {};
+  return JSON.parse(readFileSync(filePath, "utf8")) as TokenTree;
+}
+
+export function writeTokenFile(filePath: string, data: TokenTree): void {
+  writeFileSync(filePath, JSON.stringify(data, null, 2) + "\n");
+}
+
+/**
+ * Parses a raw value into a DTCG leaf (JSON object or string).
+ */
+export function parseTokenValue(value: string): TokenLeaf {
   try {
     const parsed = JSON.parse(value);
-    if (typeof parsed === "object") {
-      return { $value: parsed };
-    }
     return { $value: parsed };
   } catch {
     return { $value: value.trim() };
   }
 }
 
-
-export function setNestedValue(
-  obj: TokenObject,
-  pathStr: string,
-  value: TokenValue | TokenObject
-): void {
-  const parts = pathStr.split(".");
-  let current: TokenObject | TokenValue | any = obj;
-
-  for (let i = 0; i < parts.length - 1; i++) {
-    const part = parts[i];
-
-    if (
-      typeof current !== "object" ||
-      current === null ||
-      !(part in current) ||
-      typeof current[part] !== "object"
-    ) {
-      (current as TokenObject)[part] = {} as TokenObject;
+export function getNested(tree: TokenTree, tokenPath: string): TokenLeaf | TokenTree | undefined {
+  const parts = tokenPath.split(".");
+  let current: TokenLeaf | TokenTree | undefined = tree;
+  for (const p of parts) {
+    if (current && typeof current === "object" && p in current) {
+      current = (current as TokenTree)[p];
+    } else {
+      return undefined;
     }
-
-    current = (current as TokenObject)[part] as TokenObject | TokenValue;
   }
-
-  (current as TokenObject)[parts[parts.length - 1]] = value;
+  return current;
 }
 
-export function deleteNestedValue(obj: TokenObject, pathStr: string): boolean {
-  const parts = pathStr.split(".");
-  let current: TokenObject | TokenValue | any = obj;
-
+export function setNested(tree: TokenTree, tokenPath: string, value: TokenLeaf): void {
+  const parts = tokenPath.split(".");
+  let cursor: TokenTree = tree;
   for (let i = 0; i < parts.length - 1; i++) {
-    const part = parts[i];
-    if (typeof current !== "object" || current === null || !(part in current) || typeof current[part] !== "object") {
-      return false;
+    const key = parts[i];
+    const next = cursor[key];
+    if (!next || typeof next !== "object" || "$value" in next) {
+      cursor[key] = {};
     }
-    current = (current as TokenObject)[part] as TokenObject | TokenValue;
+    cursor = cursor[key] as TokenTree;
   }
+  cursor[parts[parts.length - 1]] = value;
+}
 
-  const lastPart = parts[parts.length - 1];
-  if (lastPart in current) {
-    delete (current as TokenObject)[lastPart];
+export function deleteNested(tree: TokenTree, tokenPath: string): boolean {
+  const parts = tokenPath.split(".");
+  let cursor: TokenTree = tree;
+  for (let i = 0; i < parts.length - 1; i++) {
+    const key = parts[i];
+    if (!cursor[key] || typeof cursor[key] !== "object") return false;
+    cursor = cursor[key] as TokenTree;
+  }
+  const last = parts[parts.length - 1];
+  if (last in cursor) {
+    delete cursor[last];
     return true;
   }
   return false;
 }
 
-export function getNestedValue(
-  obj: TokenObject,
-  pathStr: string
-): TokenValue | TokenObject | undefined {
-  const parts = pathStr.split(".");
-  let current: TokenObject | TokenValue | undefined = obj;
-
-  for (const part of parts) {
-    if (current && typeof current === "object" && part in current) {
-      current = (current as TokenObject)[part];
-    } else {
-      return undefined;
-    }
-  }
-
-  return current;
-}
-
-export function cleanEmptyParents(obj: TokenObject, pathStr: string): void {
-  const parts = pathStr.split(".");
-
+export function cleanEmptyParents(tree: TokenTree, tokenPath: string): void {
+  const parts = tokenPath.split(".");
   for (let i = parts.length - 1; i > 0; i--) {
     const parentPath = parts.slice(0, i).join(".");
-    const parent = getNestedValue(obj, parentPath);
-
-    if (parent && typeof parent === "object" && Object.keys(parent).length === 0) {
-      deleteNestedValue(obj, parentPath);
+    const parent = getNested(tree, parentPath);
+    if (parent && typeof parent === "object" && !("$value" in parent) && Object.keys(parent).length === 0) {
+      deleteNested(tree, parentPath);
     } else {
       break;
     }
   }
 }
 
-export function getTokenFilePath(category: string): string {
-  const categoryDir = join(TOKENS_DIR, category);
-
-  if (!existsSync(categoryDir)) {
-    mkdirSync(categoryDir, { recursive: true });
-  }
-
-  return join(categoryDir, "base.tokens.json");
-}
-
-export function readTokenFile(filePath: string): TokenObject {
-  if (existsSync(filePath)) {
-    const content = readFileSync(filePath, "utf8");
-    return JSON.parse(content) as TokenObject;
-  }
-  return {};
-}
-
-export function writeTokenFile(filePath: string, data: TokenObject): void {
-  writeFileSync(filePath, JSON.stringify(data, null, 2) + "\n");
-}
-
-export function buildTokenPath(tokenName: string, tokenGroup?: string): string {
-  if (tokenGroup && tokenGroup.trim()) {
-    return `${tokenGroup.trim()}.${tokenName}`;
-  }
-  return tokenName;
-}
-
-export function createToken(data: TokenData): void {
-  const filePath = getTokenFilePath(data.category);
-  const tokens = readTokenFile(filePath);
-
-  if (!data.name) {
-    console.error("Token name is required for create action");
+/**
+ * Validates a path against the Curtis Nathan convention. Exits on failure.
+ */
+function assertValidPath(tokenPath: string): void {
+  const errors = TokenValidator.validatePath(tokenPath);
+  if (errors.length > 0) {
+    console.error("❌ Invalid token path (Curtis Nathan naming convention):");
+    errors.forEach((e) => console.error(`  - ${e}`));
     process.exit(1);
   }
+}
 
-  const tokenPath = buildTokenPath(data.name, data.group);
-  const tokenValue = parseTokenValue(data.value ?? "");
-
-  if (data.description) {
-    tokenValue.$description = data.description;
+/**
+ * Validates full token tree after an operation. Exits on failure.
+ * Wraps the single-hierarchy tree into the Map form expected by TokenValidator.
+ */
+function assertTreeValid(tree: TokenTree, hierarchy: Hierarchy): void {
+  const validator = new TokenValidator();
+  const byHierarchy = new Map([[hierarchy, tree as TokenGroup]]);
+  if (!validator.validate(byHierarchy)) {
+    console.error("❌ Token validation failed:");
+    validator.getErrors().forEach((e) => console.error(`  - ${e}`));
+    process.exit(1);
   }
+  validator.getWarnings().forEach((w) => console.warn(`⚠️  ${w}`));
+}
 
-  if (data.category) {
-    tokenValue.$type = data.category;
-  }
+/**
+ * Creates a token under the correct hierarchy bucket.
+ */
+export function createToken(data: TokenData): void {
+  const tokenPath = buildTokenPath(data);
+  assertValidPath(tokenPath);
 
-  if (getNestedValue(tokens, tokenPath)) {
-    console.log(`Token already exists at path: ${tokenPath}`);
-    console.log("Use update action to modify existing tokens.");
+  const hierarchy = getHierarchy(data);
+  const filePath = getTokenFilePath(hierarchy);
+  const tree = readTokenFile(filePath);
+
+  if (getNested(tree, tokenPath)) {
+    console.log(`Token already exists at path: ${tokenPath}. Use the update action instead.`);
     process.exit(0);
   }
 
-  setNestedValue(tokens, tokenPath, tokenValue);
-  writeTokenFile(filePath, tokens);
+  const leaf = parseTokenValue(data.value ?? "");
+  if (data.tokenType) leaf.$type = data.tokenType;
+  if (data.description) leaf.$description = data.description;
 
-  console.log(`Created token: ${tokenPath} = ${JSON.stringify(tokenValue)}`);
+  setNested(tree, tokenPath, leaf);
+  assertTreeValid(tree, hierarchy);
+  writeTokenFile(filePath, tree);
+
+  console.log(`✅ Created token: ${tokenPath}`);
 }
 
+/**
+ * Updates an existing token's value/type/description.
+ */
 export function updateToken(data: TokenData): void {
-  const filePath = getTokenFilePath(data.category);
-  const tokens = readTokenFile(filePath);
+  const tokenPath = buildTokenPath(data);
+  assertValidPath(tokenPath);
 
-  if (!data.tokenPath) {
-    console.error("Token path (--token-path) is required for update action");
+  const hierarchy = getHierarchy(data);
+  const filePath = getTokenFilePath(hierarchy);
+  const tree = readTokenFile(filePath);
+
+  const existing = getNested(tree, tokenPath);
+  if (!existing || typeof existing !== "object" || !("$value" in existing)) {
+    console.error(`Token not found at path: ${tokenPath}`);
     process.exit(1);
   }
 
-  const tokenPath = data.tokenPath;
-  const existing = getNestedValue(tokens, tokenPath);
+  const leaf = parseTokenValue(data.value ?? "");
+  leaf.$type = data.tokenType ?? (existing as TokenLeaf).$type;
+  leaf.$description = data.description ?? (existing as TokenLeaf).$description;
 
-  if (!existing) {
-    console.log(`Token not found at path: ${tokenPath}`);
-    process.exit(1);
-  }
+  setNested(tree, tokenPath, leaf);
+  assertTreeValid(tree, hierarchy);
+  writeTokenFile(filePath, tree);
 
-  const tokenValue = parseTokenValue(data.value ?? "");
-
-  if (typeof existing === "object" && "$description" in existing && !data.description) {
-    tokenValue.$description = (existing as TokenValue).$description;
-  } else if (data.description) {
-    tokenValue.$description = data.description;
-  }
-
-  setNestedValue(tokens, tokenPath, tokenValue);
-  writeTokenFile(filePath, tokens);
-
-  console.log(`Updated token: ${tokenPath} = ${JSON.stringify(tokenValue)}`);
+  console.log(`✅ Updated token: ${tokenPath}`);
 }
 
+/**
+ * Deletes a token and cleans up empty parent groups.
+ */
 export function deleteToken(data: TokenData): void {
-  const filePath = getTokenFilePath(data.category);
-  const tokens = readTokenFile(filePath);
+  const tokenPath = buildTokenPath(data);
+  assertValidPath(tokenPath);
 
-  if (!data.tokenPath) {
-    console.error("Token path (--token-path) is required for delete action");
+  const hierarchy = getHierarchy(data);
+  const filePath = getTokenFilePath(hierarchy);
+  const tree = readTokenFile(filePath);
+
+  if (!getNested(tree, tokenPath)) {
+    console.error(`Token not found at path: ${tokenPath}`);
     process.exit(1);
   }
 
-  const tokenPath = data.tokenPath;
+  deleteNested(tree, tokenPath);
+  cleanEmptyParents(tree, tokenPath);
+  writeTokenFile(filePath, tree);
 
-  if (!getNestedValue(tokens, tokenPath)) {
-    console.log(`Token not found at path: ${tokenPath}`);
-    process.exit(1);
-  }
-
-  deleteNestedValue(tokens, tokenPath);
-  cleanEmptyParents(tokens, tokenPath);
-  writeTokenFile(filePath, tokens);
-
-  console.log(`Deleted token: ${tokenPath}`);
+  console.log(`🗑️  Deleted token: ${tokenPath}`);
 }

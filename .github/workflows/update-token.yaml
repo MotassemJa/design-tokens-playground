@@ -1,0 +1,181 @@
+name: Update Design Token
+
+on:
+  workflow_call:
+    inputs:
+      issue-number:
+        required: true
+        type: number
+      issue-title:
+        required: true
+        type: string
+      issue-body:
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  update-token:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Parse update issue
+        id: parse
+        uses: issue-ops/parser@v5
+        with:
+          body: ${{ inputs.issue-body }}
+          issue-form-template: update-token.yaml
+
+      - name: Create branch for changes
+        id: branch
+        run: |
+          BRANCH_NAME="token-request/${{ inputs.issue-number }}-update-$(echo '${{ inputs.issue-title }}' | sed 's/\[.*\] //' | tr '[:upper:]' '[:lower:]' | tr ' ' '-' | tr -cd '[:alnum:]-' | head -c 50)"
+          echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH_NAME"
+
+      - name: Run update token script
+        run: |
+          npx tsx .github/scripts/update-token.ts \
+            --hierarchy "${{ steps.parse.outputs.parsed_hierarchy }}" \
+            --namespace "${{ steps.parse.outputs.parsed_namespace }}" \
+            --object "${{ steps.parse.outputs.parsed_object }}" \
+            --base "${{ steps.parse.outputs.parsed_base }}" \
+            --modifier "${{ steps.parse.outputs.parsed_modifier }}" \
+            --value "${{ steps.parse.outputs['parsed_new-value'] }}"
+
+      - name: Commit and push changes
+        id: commit
+        env:
+          ACTIONS_PAT: ${{ secrets.ACTIONS_PAT }}
+        run: |
+          git add tokens/
+          if git diff --staged --quiet; then
+            echo "changes=false" >> $GITHUB_OUTPUT
+            echo "No changes to commit"
+          else
+            if [ -n "${ACTIONS_PAT}" ]; then
+              git remote set-url origin https://x-access-token:${ACTIONS_PAT}@github.com/${{ github.repository }}
+            fi
+
+            git commit -m "feat(tokens): ${{ inputs.issue-title }}
+
+            Closes #${{ inputs.issue-number }}"
+            git push origin "${{ steps.branch.outputs.branch_name }}"
+            echo "changes=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Debug PR token permissions
+        if: steps.commit.outputs.changes == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.ACTIONS_PAT || github.token }}
+          TOKEN_SOURCE: ${{ secrets.ACTIONS_PAT != '' && 'ACTIONS_PAT' || 'github.token' }}
+          REPO: ${{ github.repository }}
+          BASE_BRANCH: ${{ github.event.repository.default_branch || 'main' }}
+        run: |
+          set -euo pipefail
+
+          echo "Token source: ${TOKEN_SOURCE}"
+
+          user_body=$(mktemp)
+          user_headers=$(mktemp)
+          curl -sS \
+            -o "${user_body}" \
+            -D "${user_headers}" \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/user >/dev/null
+
+          user_login=$(node -e "const fs=require('fs');const j=JSON.parse(fs.readFileSync(process.argv[1],'utf8'));process.stdout.write(j.login||'unknown');" "${user_body}")
+          echo "Authenticated as: ${user_login}"
+
+          test_body=$(mktemp)
+          test_headers=$(mktemp)
+          test_status=$(curl -sS \
+            -o "${test_body}" \
+            -D "${test_headers}" \
+            -w "%{http_code}" \
+            -X POST \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            -H "Content-Type: application/json" \
+            "https://api.github.com/repos/${REPO}/pulls" \
+            -d "{\"title\":\"permission-check\",\"body\":\"debug\",\"head\":\"debug/nonexistent-branch\",\"base\":\"${BASE_BRANCH}\"}")
+
+          accepted_perms=$(grep -i '^x-accepted-github-permissions:' "${test_headers}" | cut -d':' -f2- | tr -d '\r' | xargs || true)
+          oauth_scopes=$(grep -i '^x-oauth-scopes:' "${test_headers}" | cut -d':' -f2- | tr -d '\r' | xargs || true)
+          test_message=$(node -e "const fs=require('fs');const raw=fs.readFileSync(process.argv[1],'utf8');try{const j=JSON.parse(raw);process.stdout.write(j.message||'');}catch{process.stdout.write('non-json response');}" "${test_body}")
+
+          echo "PR endpoint status: ${test_status}"
+          echo "x-accepted-github-permissions: ${accepted_perms:-<missing>}"
+          echo "x-oauth-scopes: ${oauth_scopes:-<missing>}"
+          echo "PR endpoint message: ${test_message}"
+
+          if [ "${test_status}" = "403" ]; then
+            echo "Token cannot create pull requests in this repository."
+          fi
+
+      - name: Create Pull Request
+        if: steps.commit.outputs.changes == 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.ACTIONS_PAT || github.token }}
+          script: |
+            const tokenData = JSON.parse('${{ steps.parse.outputs.json }}');
+
+            const prBody = `## Token Change Request
+
+            This PR was automatically generated from issue #${{ inputs.issue-number }}.
+
+            ### Details
+            - **Action**: UPDATE
+            - **Namespace**: ${tokenData.namespace || 'N/A'}
+            - **Object**: ${tokenData.object || '-'}
+            - **Base**: ${tokenData.base || '-'}
+            - **Modifier**: ${tokenData.modifier || '-'}
+            - **Current Value**: \`${tokenData['current-value']}\`
+            - **New Value**: \`${tokenData['new-value']}\`
+            - **Breaking Change**: ${tokenData['breaking-change'] || 'Not specified'}
+
+            ### Reason
+            ${tokenData.reason || 'No reason provided.'}
+
+            ---
+
+            **Reviewers**: Please verify the token change is correct before merging.
+
+            Closes #${{ inputs.issue-number }}.`;
+
+            const pr = await github.rest.pulls.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: '${{ inputs.issue-title }}',
+              body: prBody,
+              head: "${{ steps.branch.outputs.branch_name }}",
+              base: context.payload.repository.default_branch,
+            });
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: ${{ inputs.issue-number }},
+              body: `✅ Pull request #${pr.data.number} created with your token changes. Please review it: ${pr.data.html_url}`,
+            });

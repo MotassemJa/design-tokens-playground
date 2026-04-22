@@ -7,39 +7,80 @@ body:
     attributes:
       value: |
         ## Delete a Design Token
-        ⚠️ **Warning**: Deleting tokens may break existing implementations. Please ensure you have communicated this change with consuming teams.
+
+        ⚠️ **Warning**: Deleting tokens may break existing implementations and any
+        higher-layer tokens that reference them.
+
+        Identify the token with the four **Curtis Nathan** groups.
+        Select the hierarchy from the dropdown — do **not** include it in the path.
+
+        **Curtis Nathan naming**: `{namespace}.{object}.{base}.{modifier}`
+        where `namespace` = `system.theme.domain`, `object` = `group.component.element`,
+        `base` = `category.concept.property`, `modifier` = `variant.state.scale.mode`.
 
   - type: dropdown
-    id: category
+    id: hierarchy
     attributes:
-      label: Token Category
-      description: Which category contains the token?
+      label: Hierarchy
+      description: Which layer does this token belong to?
       options:
-        - color
-        - typography
-        - spacing
-        - shadow
-        - border
-        - animation
-        - breakpoint
+        - design-values
+        - universal
+        - system
+        - semantic
+        - component
     validations:
       required: true
 
   - type: input
-    id: token-path
+    id: namespace
     attributes:
-      label: Token Path
-      description: The full path to the token using dot notation.
-      placeholder: "brand.deprecated.oldBlue"
+      label: Namespace (theme / domain)
+      description: Optional theme + domain — do **not** include the hierarchy keyword.
+      placeholder: "light.color"
     validations:
-      required: true
+      required: false
+
+  - type: input
+    id: object
+    attributes:
+      label: Object
+      placeholder: "button.primary"
+    validations:
+      required: false
+
+  - type: input
+    id: base
+    attributes:
+      label: Base
+      placeholder: "color.background"
+    validations:
+      required: false
+
+  - type: input
+    id: modifier
+    attributes:
+      label: Modifier
+      placeholder: "hover.on-light"
+    validations:
+      required: false
 
   - type: textarea
     id: reason
     attributes:
       label: Reason for Deletion
-      description: Why should this token be removed?
-      placeholder: "Token is deprecated and has been replaced by brand.primary.500"
+      placeholder: "Token is obsolete and has been consolidated into the new v2 system."
+    validations:
+      required: true
+
+  - type: textarea
+    id: impact-analysis
+    attributes:
+      label: Impact Analysis
+      description: What tokens or components depend on this token?
+      placeholder: |
+        - Dependent tokens: action.color.background.primary
+        - Affected components: button.primary, nav.item
     validations:
       required: true
 
@@ -47,15 +88,24 @@ body:
     id: replacement
     attributes:
       label: Replacement Token (if any)
-      description: What token should be used instead?
-      placeholder: "brand.primary.500"
+      placeholder: "action.color.background.primary"
+
+  - type: textarea
+    id: migration-guide
+    attributes:
+      label: Migration Guide
+      placeholder: |
+        Replace uses of `semantic.action.color.background.deprecated` with
+        `semantic.action.color.background.primary`. Visuals are identical.
 
   - type: checkboxes
     id: confirmation
     attributes:
       label: Confirmation
       options:
-        - label: I understand this may be a breaking change
+        - label: I understand this is a breaking change.
           required: true
-        - label: I have notified teams that consume these tokens
+        - label: I have verified no higher-layer tokens depend on this token.
+          required: true
+        - label: I have notified consuming teams and provided a migration path.
           required: true

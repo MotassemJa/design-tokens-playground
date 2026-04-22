@@ -1,5 +1,5 @@
 name: 🎨 Create New Token
-description: Request a new design token to be added to the system
+description: Request a new design token in the 4-layer hierarchy (universal → system → semantic → component)
 title: "[CREATE] "
 labels: ["token-request", "create"]
 body:
@@ -7,83 +7,146 @@ body:
     attributes:
       value: |
         ## Create a New Design Token
-        Fill out the form below to request a new token. A pull request will be automatically created for review.
+
+        All tokens follow the **Curtis Nathan naming convention**, composed of four
+        group fields:
+
+        ```
+        {namespace}.{object}.{base}.{modifier}
+        ```
+
+        | Group      | Segments                          | Example                           |
+        | ---------- | --------------------------------- | --------------------------------- |
+        | namespace  | `system.theme.domain`             | `system.light.color`              |
+        | object     | `group.component.element`         | `button.primary.text`             |
+        | base       | `category.concept.property`       | `color` or `space.padding`        |
+        | modifier   | `variant.state.scale.mode`        | `hover.on-light` or _(empty)_     |
+
+        **5-Layer Hierarchy**
+
+        | Layer           | Can reference                                          | Example value                                        |
+        | --------------- | ------------------------------------------------------ | ---------------------------------------------------- |
+        | `design-values` | _(nothing — raw primitives only)_                      | `blue.500.lightness` → `0.4989`                      |
+        | `universal`     | `design-values`                                        | `blue.500` → `oklch({blue.500.lightness} ...)`       |
+        | `system`        | `design-values`, `universal`                           | `color.primary` → `{universal.blue.500}`             |
+        | `semantic`      | `design-values`, `universal`, `system`                 | `color.action.primary` → `{system.color.primary}`    |
+        | `component`     | `design-values`, `universal`, `system`, `semantic`     | `color.background.solid` → `{semantic.color.action.primary}` |
+
+        **Rules**
+        - Every segment is **lowercase kebab-case** (`on-brand`, `primary-text`).
+        - The hierarchy is selected separately — do **not** include it in the token path.
+        - `design-values` tokens hold raw primitive values only (no `{ref}`).
+        - Each layer may reference any layer that is **below** it in the hierarchy.
+
+        **Good examples**
+        - `design-values.blue.500.lightness` → `0.4989`
+        - `universal.blue.500` → `oklch({blue.500.lightness} {blue.chroma} {blue.hue})`
+        - `system.light.color.brand.primary` → `{universal.blue.500}`
+        - `semantic.action.color.background.primary` → `{system.light.color.brand.primary}`
+        - `component.button.primary.color.background` → `{semantic.action.color.background.primary}`
+
+        > Only fill in the four group fields below. Leave unused groups empty — the
+        > build pipeline (TokenScript + validator) will reject malformed paths.
 
   - type: dropdown
-    id: category
+    id: hierarchy
     attributes:
-      label: Token Category
-      description: What type of token is this?
+      label: Hierarchy
+      description: Which layer does this token belong to?
       options:
-        - color
-        - typography
-        - spacing
-        - shadow
-        - border
-        - animation
-        - breakpoint
+        - design-values
+        - universal
+        - system
+        - semantic
+        - component
     validations:
       required: true
 
   - type: input
-    id: token-name
+    id: namespace
     attributes:
-      label: Token Name
+      label: Namespace (theme / domain)
       description: |
-        Use kebab-case (e.g., primary-blue, heading-large, spacing-md).
-        This will be the key used to reference the token.
-      placeholder: "e.g., primary-blue-500"
+        Optional theme + domain — do **not** include the hierarchy keyword.
+        Joined by `.`.
+      placeholder: "light.color"
     validations:
-      required: true
+      required: false
+
+  - type: input
+    id: object
+    attributes:
+      label: Object
+      description: |
+        Group / component / element that the token applies to. Optional.
+      placeholder: "button.primary"
+    validations:
+      required: false
+
+  - type: input
+    id: base
+    attributes:
+      label: Base
+      description: |
+        Category / concept / property being styled. Optional, but strongly recommended.
+      placeholder: "color.background"
+    validations:
+      required: false
+
+  - type: input
+    id: modifier
+    attributes:
+      label: Modifier
+      description: |
+        Variant / state / scale / mode. Optional.
+      placeholder: "hover.on-light"
+    validations:
+      required: false
 
   - type: textarea
     id: token-value
     attributes:
       label: Token Value
       description: |
-        The value for this token. Examples:
-        - Color: #3B82F6 or rgb(59, 130, 246)
-        - Spacing: 16px or 1rem
-        - Typography: { "fontSize": "18px", "fontWeight": "600", "lineHeight": "1.5" }
-        - Shadow: 0 4px 6px rgba(0, 0, 0, 0.1)
-      placeholder: "#3B82F6"
+        Raw value, or `{path.to.token}` reference to any layer below this one.
+
+        - design-values: raw primitives only — `0.4989`, `210`, `0.6`
+        - universal: reference to design-values — `oklch({blue.500.lightness} {blue.chroma} {blue.hue})`
+        - system: reference to design-values or universal — `{universal.blue.500}`
+        - semantic: reference to any lower layer — `{system.light.color.brand.primary}`
+        - component: reference to any lower layer — `{semantic.action.color.background.primary}`
+      placeholder: "0.4989 or {semantic.action.color.background.primary}"
     validations:
       required: true
 
   - type: input
-    id: token-group
+    id: token-type
     attributes:
-      label: Token Group (Optional)
-      description: |
-        Nest this token under a group. Use dot notation for nested groups.
-        Leave empty for root-level tokens.
-      placeholder: "e.g., brand.primary or feedback.success"
+      label: Token Type
+      description: "DTCG `$type` for this token."
+      placeholder: "color, dimension, fontFamily, fontWeight, duration, …"
+    validations:
+      required: true
 
   - type: textarea
     id: description
     attributes:
       label: Description
-      description: Explain the purpose and intended use of this token.
-      placeholder: "Primary brand color used for main CTAs and links"
+      description: What does this token represent and when should it be used?
+      placeholder: "Primary brand background color for main CTAs."
     validations:
       required: true
-
-  - type: textarea
-    id: usage-examples
-    attributes:
-      label: Usage Examples
-      description: Where should this token be used?
-      placeholder: |
-        - Primary buttons
-        - Active navigation items
-        - Link text color
 
   - type: checkboxes
     id: confirmation
     attributes:
       label: Pre-submission Checklist
       options:
-        - label: I have checked that this token does not already exist
+        - label: The hierarchy is one of `design-values` / `universal` / `system` / `semantic` / `component`.
           required: true
-        - label: The token name follows our naming conventions
+        - label: All segments in every group are lowercase `kebab-case`.
+          required: true
+        - label: The `$value` references only tokens from a layer **below** this one (or is a raw value for `design-values`).
+          required: true
+        - label: The `$type` is a valid DTCG type.
           required: true

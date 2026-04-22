@@ -5,16 +5,32 @@ on:
     branches: [main]
     paths:
       - 'tokens/**'
-      - 'config.json'
+      - 'src/**'
+      - 'tests/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tsconfig.json'
+      - 'tsconfig.test.json'
+      - 'jest.config.cjs'
+      - '.github/workflows/build-tokens.yaml'
   pull_request:
     branches: [main]
     paths:
       - 'tokens/**'
-      - 'config.json'
+      - 'src/**'
+      - 'tests/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tsconfig.json'
+      - 'tsconfig.test.json'
+      - 'jest.config.cjs'
+      - '.github/workflows/build-tokens.yaml'
 
 permissions:
   contents: read
   pull-requests: write
+  pages: write
+  id-token: write
 
 jobs:
   build:
@@ -23,6 +39,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -32,6 +50,19 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Build base branch tokens (before)
+        if: github.event_name == 'pull_request'
+        run: |
+          git stash --include-untracked || true
+          git checkout ${{ github.base_ref }}
+          npm run build -- --no-css --no-js --no-types 2>/dev/null || npm run build
+          cp dist/tokens.json /tmp/tokens-before.json
+          git checkout -
+          git stash pop || true
+
+      - name: Run tests
+        run: npm test
 
       - name: Build tokens
         run: npm run build
@@ -52,56 +83,79 @@ jobs:
           path: dist/
           retention-days: 30
 
-      - name: Comment build preview on PR
+      - name: Comment token diff on PR
         if: github.event_name == 'pull_request'
         uses: actions/github-script@v9
         with:
           script: |
             const fs = require('fs');
-            const path = require('path');
-            
-            // Read a sample of built tokens for preview
-            let cssPreview = '';
-            const cssPath = 'dist/css/variables.css';
-            if (fs.existsSync(cssPath)) {
-              const content = fs.readFileSync(cssPath, 'utf8');
-              const lines = content.split('\n').slice(0, 30);
-              cssPreview = lines.join('\n');
-              if (content.split('\n').length > 30) {
-                cssPreview += '\n/* ... truncated ... */';
+
+            function flattenTokens(obj, prefix = '') {
+              const result = {};
+              for (const [key, val] of Object.entries(obj)) {
+                const path = prefix ? `${prefix}.${key}` : key;
+                if (val && typeof val === 'object' && '$value' in val) {
+                  result[path] = val['$value'];
+                } else if (val && typeof val === 'object') {
+                  Object.assign(result, flattenTokens(val, path));
+                }
+              }
+              return result;
+            }
+
+            const afterPath = 'dist/tokens.json';
+            const beforePath = '/tmp/tokens-before.json';
+
+            const after = flattenTokens(JSON.parse(fs.readFileSync(afterPath, 'utf8')));
+            const before = fs.existsSync(beforePath)
+              ? flattenTokens(JSON.parse(fs.readFileSync(beforePath, 'utf8')))
+              : {};
+
+            const added = [];
+            const removed = [];
+            const changed = [];
+
+            const allKeys = new Set([...Object.keys(before), ...Object.keys(after)]);
+            for (const key of [...allKeys].sort()) {
+              if (!(key in before)) {
+                added.push(`+ \`${key}\`: \`${after[key]}\``);
+              } else if (!(key in after)) {
+                removed.push(`- \`${key}\``);
+              } else if (before[key] !== after[key]) {
+                changed.push(`~ \`${key}\`: \`${before[key]}\` → \`${after[key]}\``);
               }
             }
-            
-            const comment = `## 🎨 Token Build Preview
-            
-            Build completed successfully! Here's a preview of the generated CSS variables:
-            
-            \`\`\`css
-            ${cssPreview || 'No CSS output generated'}
-            \`\`\`
-            
-            <details>
-            <summary>📦 All generated formats</summary>
-            
-            - CSS Variables (\`build/css/\`)
-            - JavaScript/TypeScript (\`build/js/\`)
-            - JSON (\`build/json/\`)
-            - SCSS (\`build/scss/\`)
-            
-            </details>`;
-            
-            // Find existing comment to update
+
+            const totalChanged = added.length + removed.length + changed.length;
+            let diffBody = '';
+
+            if (totalChanged === 0) {
+              diffBody = '_No token value changes detected._';
+            } else {
+              if (changed.length) diffBody += `### Modified (${changed.length})\n${changed.join('\n')}\n\n`;
+              if (added.length)   diffBody += `### Added (${added.length})\n${added.join('\n')}\n\n`;
+              if (removed.length) diffBody += `### Removed (${removed.length})\n${removed.join('\n')}\n\n`;
+            }
+
+            const comment = [
+              '## 🎨 Token Build Preview',
+              '',
+              `Build completed successfully. **${totalChanged}** token(s) changed.`,
+              '',
+              diffBody.trim(),
+            ].join('\n');
+
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.payload.pull_request.number
             });
-            
-            const botComment = comments.find(c => 
-              c.user.login === 'github-actions[bot]' && 
+
+            const botComment = comments.find(c =>
+              c.user.login === 'github-actions[bot]' &&
               c.body.includes('Token Build Preview')
             );
-            
+
             if (botComment) {
               await github.rest.issues.updateComment({
                 owner: context.repo.owner,
@@ -118,11 +172,11 @@ jobs:
               });
             }
 
-  publish:
+  artifacts:
     needs: build
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -133,14 +187,82 @@ jobs:
           name: design-tokens-build
           path: dist/
 
+      - name: Display build summary
+        run: |
+          echo "🎨 Design Tokens Build Summary"
+          echo "================================"
+          echo ""
+          echo "📦 Build Artifacts:"
+          find dist -type f -exec ls -lh {} \; | awk '{print "  " $9 " (" $5 ")"}'
+          echo ""
+          echo "📋 Token Statistics:"
+          echo "  Total token files: $(find dist -name "*.json" | wc -l)"
+          echo "  CSS variables: $(wc -l < dist/css/variables.css) lines"
+          echo "  JavaScript exports: $(wc -l < dist/tokens.js) lines"
+          echo "  TypeScript definitions: $(wc -l < dist/tokens.d.ts) lines"
+          echo ""
+          echo "🔗 Download Links:"
+          echo "  CSS Variables: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          echo "  JavaScript Module: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          echo "  TypeScript Types: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          echo "  JSON Exports: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          echo ""
+          echo "📖 Preview: https://phhbr.github.io/design-tokens-playground/"
+
+      - name: Upload downloadable artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: design-tokens-dist
+          path: dist/
+          retention-days: 7
+
+  pages:
+    needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '24'
-          registry-url: '[npm.pkg.github.com](https://npm.pkg.github.com)'
-          scope: '@your-org'
+          cache: 'npm'
 
-      - name: Publish to GitHub Packages
-        run: npm publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build tokens and preview
+        run: npm run build
+
+      - name: Prepare GitHub Pages site
+        run: |
+          mkdir -p site
+          cp -R preview site/
+          cp -R dist site/
+          cat > site/index.html <<'EOF'
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+            <meta charset="UTF-8" />
+            <meta http-equiv="refresh" content="0;url=preview/index.html" />
+            <title>Design Tokens Preview</title>
+          </head>
+          <body>
+            <p>Redirecting to <a href="preview/index.html">preview/index.html</a>...</p>
+          </body>
+          </html>
+          EOF
+
+      - name: Upload GitHub Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v4

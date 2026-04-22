@@ -1,14 +1,62 @@
 {
   "name": "design-tokens-playground",
   "version": "1.0.0",
-  "description": "",
+  "description": "Design tokens system built with Style Dictionary",
   "type": "module",
+  "main": "./dist/tokens.js",
+  "types": "./dist/tokens.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/tokens.d.ts",
+      "import": "./dist/tokens.js"
+    },
+    "./css": {
+      "default": "./dist/css/variables.css"
+    },
+    "./tokens": {
+      "default": "./dist/tokens.json"
+    },
+    "./resolved": {
+      "default": "./dist/tokens.resolved.json"
+    },
+    "./interpreted": {
+      "default": "./dist/tokens.interpreted.json"
+    }
+  },
+  "bin": {
+    "design-tokens": "./dist/index.js"
+  },
   "files": [
     "dist"
   ],
   "scripts": {
-    "build": "tsx src/index.ts"
+    "build": "tsx src/index.ts",
+    "build:css-only": "tsx src/index.ts --no-js --no-types --no-json",
+    "build:js-only": "tsx src/index.ts --no-css --no-types --no-json",
+    "build:types-only": "tsx src/index.ts --no-css --no-js --no-json",
+    "build:watch": "tsx --watch src/index.ts",
+    "clean": "rm -rf dist",
+    "publish:npm": "npm run build && npm publish",
+    "preview": "npm run build && npx http-server . -p 8000 -o /preview/index.html",
+    "test": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --runInBand",
+    "test:watch": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --watch"
   },
+  "keywords": [
+    "design-tokens",
+    "design-system",
+    "style-dictionary",
+    "tokenscript-interpreter",
+    "tokens",
+    "css",
+    "variables",
+    "typescript",
+    "javascript",
+    "clamp",
+    "css-functions",
+    "advanced-token-processing",
+    "domain-specific-language",
+    "token-computation"
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/MotassemJa/design-tokens-playground.git"
@@ -20,11 +68,17 @@
   },
   "homepage": "https://github.com/MotassemJa/design-tokens-playground#readme",
   "devDependencies": {
+    "@types/jest": "29.5.14",
     "@types/node": "^25.0.0",
     "@types/yargs": "^17.0.0",
+    "jest": "29.7.0",
     "style-dictionary": "^5.4.0",
+    "ts-jest": "29.4.9",
     "tsx": "^4.0.0",
     "typescript": "^5.0.0",
     "yargs": "^18.0.0"
+  },
+  "dependencies": {
+    "@tokens-studio/tokenscript-interpreter": "0.32.0"
   }
 }

@@ -1,17 +1,16 @@
-# Design Tokens Playground - TODOs
+# TODO
 
-## Must Haves
+## Next Work
 
-- [ ] Update & delete token workflows (same principle as create)
-- [ ] New project for previewing all "final" tokens
-  - Overview display grouped by type
-  - Ability to copy tokens
-  - Ability to copy values
-- [ ] Publish step for npm package
-- [ ] Support for semantic tokens
-- [ ] Support for component tokens (inherited)
-- [ ] Schema validation (Design Tokens Format Module 2025.10+)
+- [ ] Add one hover state spike for `component.button.primary`
+- [ ] Add one dark-theme spike path while preserving strict hierarchy
+- [ ] Add small test coverage for token loader and reference resolver
+- [ ] Add CI step that validates docs mention only existing token files
+- [ ] Add release note automation for token changes
 
-## Nice to Have
+## Maintenance Rules
 
-- [ ] Issue commitlint when changing a token
+- Keep the production token set intentionally minimal.
+- Add tokens only when they serve a documented spike scenario.
+- Keep docs synchronized with actual files and commands.
+

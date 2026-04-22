@@ -7,41 +7,75 @@ body:
     attributes:
       value: |
         ## Update an Existing Design Token
-        Fill out the form below to request changes to a token. A pull request will be automatically created for review.
+
+        Identify the token with the four **Curtis Nathan** groups and provide the new value.
+        Select the hierarchy from the dropdown — do **not** include it in the path.
+
+        All segments are **lowercase kebab-case**. Hierarchy rules still apply — each layer may
+        reference any layer **below** it:
+        - `design-values` → (nothing)
+        - `universal` → `design-values`
+        - `system` → `design-values`, `universal`
+        - `semantic` → `design-values`, `universal`, `system`
+        - `component` → `design-values`, `universal`, `system`, `semantic`
+
+        **Curtis Nathan naming**: `{namespace}.{object}.{base}.{modifier}`
+        where `namespace` = `system.theme.domain`, `object` = `group.component.element`,
+        `base` = `category.concept.property`, `modifier` = `variant.state.scale.mode`.
 
   - type: dropdown
-    id: category
+    id: hierarchy
     attributes:
-      label: Token Category
-      description: Which category contains the token?
+      label: Hierarchy
+      description: Which layer does this token belong to?
       options:
-        - color
-        - typography
-        - spacing
-        - shadow
-        - border
-        - animation
-        - breakpoint
+        - design-values
+        - universal
+        - system
+        - semantic
+        - component
     validations:
       required: true
 
   - type: input
-    id: token-path
+    id: namespace
     attributes:
-      label: Token Path
-      description: |
-        The full path to the token using dot notation.
-        Example: brand.primary.500 or feedback.error.background
-      placeholder: "brand.primary.500"
+      label: Namespace (theme / domain)
+      description: Optional theme + domain — do **not** include the hierarchy keyword.
+      placeholder: "light.color"
     validations:
-      required: true
+      required: false
+
+  - type: input
+    id: object
+    attributes:
+      label: Object
+      placeholder: "button.primary"
+    validations:
+      required: false
+
+  - type: input
+    id: base
+    attributes:
+      label: Base
+      placeholder: "color.background"
+    validations:
+      required: false
+
+  - type: input
+    id: modifier
+    attributes:
+      label: Modifier
+      placeholder: "hover.on-light"
+    validations:
+      required: false
 
   - type: textarea
     id: current-value
     attributes:
       label: Current Value
-      description: What is the current value? (helps verify we're updating the right token)
-      placeholder: "#3B82F6"
+      description: Helps verify we are updating the right token.
+      placeholder: "#3B82F6 or {light.color.brand.primary}"
     validations:
       required: true
 
@@ -49,8 +83,8 @@ body:
     id: new-value
     attributes:
       label: New Value
-      description: What should the new value be?
-      placeholder: "#2563EB"
+      description: Must follow the inheritance rules for this layer.
+      placeholder: "#2563EB or {light.color.brand.secondary}"
     validations:
       required: true
 
@@ -58,7 +92,6 @@ body:
     id: reason
     attributes:
       label: Reason for Change
-      description: Why does this token need to be updated?
       placeholder: "Accessibility audit found insufficient contrast ratio..."
     validations:
       required: true
@@ -67,10 +100,21 @@ body:
     id: breaking-change
     attributes:
       label: Is this a breaking change?
-      description: Will this change significantly affect existing designs?
       options:
-        - "No - Minor adjustment"
-        - "Yes - Significant visual change"
-        - "Unsure - Needs review"
+        - "No — Minor adjustment"
+        - "Yes — Significant visual change"
+        - "Unsure — Needs review"
     validations:
       required: true
+
+  - type: checkboxes
+    id: confirmation
+    attributes:
+      label: Pre-update Checklist
+      options:
+        - label: I understand this change may cascade to higher-layer tokens that reference this one.
+          required: true
+        - label: The new value references only tokens from a layer **below** this one (or is a raw value for `design-values`).
+          required: true
+        - label: I have verified there are no circular reference issues.
+          required: true
