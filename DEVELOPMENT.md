@@ -24,7 +24,7 @@ Edit files in `tokens/`, refresh preview, and inspect generated artifacts in `di
 
 ## Build Flow
 
-1. `src/token-loader.ts` loads `tokens/{design-values,universal,system,semantic,component}/tokens.json` (only that exact layout is accepted).
+1. `src/token-loader.ts` loads `tokens/{universal,system,semantic,component}/tokens.json` (only that exact layout is accepted).
 2. `src/token-validator.ts` validates Curtis Nathan naming + layer-reference rules. Value validation is delegated to TokenScript.
 3. `src/build-tokens.ts` runs `@tokens-studio/tokenscript-interpreter` for interpretation and value validation.
 4. `src/token-reference-resolver.ts` resolves references for resolved output.
@@ -33,11 +33,10 @@ Edit files in `tokens/`, refresh preview, and inspect generated artifacts in `di
 
 ## Token Layer Rules
 
-- `design-values` tokens are raw primitives and may only reference `design-values`
-- `universal` tokens may reference `design-values` and `universal`
-- `system` tokens may reference `design-values`, `universal`, and `system`
-- `semantic` tokens may reference `design-values`, `universal`, `system`, and `semantic`
-- `component` tokens may reference `design-values`, `universal`, `system`, `semantic`, and `component`
+- `universal.*` references nothing
+- `system.*` references `universal.*`
+- `semantic.*` references `system.*`
+- `component.*` references `semantic.*`
 
 Cross-layer violations fail validation.
 
@@ -45,7 +44,6 @@ Cross-layer violations fail validation.
 
 Exactly one file per hierarchy, always named `tokens.json`:
 
-- `tokens/design-values/tokens.json`
 - `tokens/universal/tokens.json`
 - `tokens/system/tokens.json`
 - `tokens/semantic/tokens.json`
@@ -56,8 +54,7 @@ Any other filename or subdirectory is rejected by `TokenLoader.assertLayoutStric
 ## Token Naming (Curtis Nathan)
 
 Paths are always `{namespace}.{object}.{base}.{modifier}` with all segments
-in lowercase kebab-case. Hierarchy is selected separately and is never prefixed
-onto the token path. See README.md for full examples.
+in lowercase kebab-case. See README.md for full examples.
 
 ## Build Commands
 

@@ -2,7 +2,7 @@
 
 A minimal DTCG token pipeline with one end-to-end production spike across all layers:
 
-- design-values -> universal -> system -> semantic -> component
+- universal -> system -> semantic -> component
 - one color chain
 - one spacing chain
 
@@ -12,19 +12,17 @@ The repository is intentionally small so the build, validation, and workflow beh
 
 ### Color chain
 
-1. `blue.500.lightness` -> `0.4989`
-2. `blue.500` -> `oklch({blue.500.lightness} {blue.chroma} {blue.hue})`
-3. `light.color.brand.primary` -> `{blue.500}`
-4. `action.color.background.primary` -> `{light.color.brand.primary}`
-5. `button.primary.color.background` -> `{action.color.background.primary}`
+1. `universal.color.blue.500`
+2. `system.light.color.brand.primary` -> `{universal.color.blue.500}`
+3. `semantic.action.color.background.primary` -> `{system.light.color.brand.primary}`
+4. `component.button.primary.color.background` -> `{semantic.action.color.background.primary}`
 
 ### Spacing chain
 
-1. `space.scale.200` -> `0.5rem`
-2. `space.control.padding.inline.md` -> `{space.scale.200}`
-3. `light.space.button.padding.inline` -> `{space.control.padding.inline.md}`
-4. `action.space.padding.default` -> `{light.space.button.padding.inline}`
-5. `button.primary.space.padding.inline` -> `{action.space.padding.default}`
+1. `universal.space.scale.200`
+2. `system.light.space.button.padding.horizontal` -> `{universal.space.scale.200}`
+3. `semantic.action.space.padding.default` -> `{system.light.space.button.padding.horizontal}`
+4. `component.button.primary.space.padding` -> `{semantic.action.space.padding.default}`
 
 ## Commands
 
@@ -72,7 +70,6 @@ npm run build -- --no-references
 
 ```text
 tokens/
-  design-values/tokens.json
   universal/tokens.json
   system/tokens.json
   semantic/tokens.json
@@ -88,7 +85,7 @@ src/
 
 tests/
   fixtures/
-    valid/                  # happy-path fixture (all 5 layers)
+    valid/                  # happy-path fixture (all 4 layers)
     invalid-naming/         # breaks Curtis Nathan kebab-case rule
     invalid-hierarchy/      # universal token referencing another layer
     invalid-reference/      # unresolved {path.to.token}
@@ -107,24 +104,21 @@ tests/
 
 Every token path has four group slots:
 
-```text
+```
 {namespace}.{object}.{base}.{modifier}
 ```
 
-| Group | What it captures | Example |
-| --- | --- | --- |
-| namespace | `system.theme.domain` model; in actual token paths use theme/domain only | `light.color` |
-| object | group / component / element | `button.primary` |
-| base | category / concept / property | `color.background` |
-| modifier | variant / state / scale / mode | `hover.on-light` or _(empty)_ |
+| Group      | What it captures                                   | Example                         |
+| ---------- | -------------------------------------------------- | ------------------------------- |
+| namespace  | hierarchy level + optional theme + optional domain | `system.light.color`            |
+| object     | group / component / element                        | `button.primary`                |
+| base       | category / concept / property                      | `color.background`              |
+| modifier   | variant / state / scale / mode                     | `hover.on-light` or _(empty)_   |
 
 - Every segment must be **lowercase kebab-case** (`on-brand`, `primary-text`, `500`).
-- Hierarchy is selected separately by folder, workflow input, or CLI flag — do **not** include it in the token path.
-- References may point to tokens in the same layer or any lower layer:
-  design-values → design-values, universal → design-values/universal,
-  system → design-values/universal/system,
-  semantic → design-values/universal/system/semantic,
-  component → design-values/universal/system/semantic/component.
+- The first segment (from `namespace`) must be one of `universal`, `system`, `semantic`, `component`.
+- References may only point one layer up:
+  universal → (none), system → universal, semantic → system, component → semantic.
 
 Validation is enforced at build time (`npm run build`) and by the Jest suite
 (`npm test`). Issue forms under `.github/ISSUE_TEMPLATE/` only ask for the four
@@ -132,8 +126,8 @@ group fields — see the inline examples in each form for guidance.
 
 ## What This Repository Does
 
-- Loads and merges `tokens/{design-values,universal,system,semantic,component}/tokens.json`
-- Validates Curtis Nathan naming + 5-layer hierarchy references
+- Loads and merges `tokens/{universal,system,semantic,component}/tokens.json`
+- Validates Curtis Nathan naming + 4-layer hierarchy references
 - Runs TokenScript (`@tokens-studio/tokenscript-interpreter`) for value interpretation and validation
 - Resolves token references for the resolved JSON output
 - Builds CSS, JS, and TypeScript outputs via Style Dictionary
@@ -206,6 +200,17 @@ npm run preview
 
 This builds first, then serves `preview/index.html` and reads from `dist/tokens.resolved.json`.
 
+## TokenScript Schema Examples
+
+Example schema specs for extending TokenScript with `oklch(...)` and a safe
+`clamp_string(...)` helper are available in:
+
+- `examples/tokenscript-schemas/`
+
+These are reference examples and are not auto-registered by this repository's
+runtime pipeline.
+
 ## Automation
 
 GitHub workflows in `.github/workflows/` support create, update, and delete token requests via issue templates and helper scripts under `.github/scripts/`.
+

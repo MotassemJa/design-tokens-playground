@@ -1,5 +1,5 @@
 name: 🎨 Create New Token
-description: Request a new design token in the 5-layer hierarchy (design-values → universal → system → semantic → component)
+description: Request a new design token in the 4-layer hierarchy (universal → system → semantic → component)
 title: "[CREATE] "
 labels: ["token-request", "create"]
 body:
@@ -17,7 +17,7 @@ body:
 
         | Group      | Segments                          | Example                           |
         | ---------- | --------------------------------- | --------------------------------- |
-        | namespace  | `system.theme.domain`             | `light.color`                     |
+        | namespace  | `system.theme.domain`             | `system.light.color`              |
         | object     | `group.component.element`         | `button.primary.text`             |
         | base       | `category.concept.property`       | `color` or `space.padding`        |
         | modifier   | `variant.state.scale.mode`        | `hover.on-light` or _(empty)_     |
@@ -39,11 +39,11 @@ body:
         - Each layer may reference any layer that is **below** it in the hierarchy.
 
         **Good examples**
-        - `blue.500.lightness` → `0.4989`
-        - `blue.500` → `oklch({blue.500.lightness} {blue.chroma} {blue.hue})`
-        - `light.color.brand.primary` → `{blue.500}`
-        - `action.color.background.primary` → `{light.color.brand.primary}`
-        - `button.primary.color.background` → `{action.color.background.primary}`
+        - `design-values.blue.500.lightness` → `0.4989`
+        - `universal.blue.500` → `oklch({blue.500.lightness} {blue.chroma} {blue.hue})`
+        - `system.light.color.brand.primary` → `{universal.blue.500}`
+        - `semantic.action.color.background.primary` → `{system.light.color.brand.primary}`
+        - `component.button.primary.color.background` → `{semantic.action.color.background.primary}`
 
         > Only fill in the four group fields below. Leave unused groups empty — the
         > build pipeline (TokenScript + validator) will reject malformed paths.
@@ -68,8 +68,6 @@ body:
       label: Namespace (theme / domain)
       description: |
         Optional theme + domain — do **not** include the hierarchy keyword.
-        The Curtis Nathan segment model uses `system.theme.domain`, but the actual
-        namespace value here should only contain the theme/domain portion.
         Joined by `.`.
       placeholder: "light.color"
     validations:
@@ -114,10 +112,10 @@ body:
 
         - design-values: raw primitives only — `0.4989`, `210`, `0.6`
         - universal: reference to design-values — `oklch({blue.500.lightness} {blue.chroma} {blue.hue})`
-        - system: reference to design-values or universal — `{blue.500}`
-        - semantic: reference to any lower layer — `{light.color.brand.primary}`
-        - component: reference to any lower layer — `{action.color.background.primary}`
-      placeholder: "0.4989 or {action.color.background.primary}"
+        - system: reference to design-values or universal — `{universal.blue.500}`
+        - semantic: reference to any lower layer — `{system.light.color.brand.primary}`
+        - component: reference to any lower layer — `{semantic.action.color.background.primary}`
+      placeholder: "0.4989 or {semantic.action.color.background.primary}"
     validations:
       required: true
 

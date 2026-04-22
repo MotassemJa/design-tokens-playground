@@ -20,7 +20,7 @@ body:
         - `component` → `design-values`, `universal`, `system`, `semantic`
 
         **Curtis Nathan naming**: `{namespace}.{object}.{base}.{modifier}`
-        where `namespace` = `system.theme.domain` (enter only the theme/domain value in the form), `object` = `group.component.element`,
+        where `namespace` = `system.theme.domain`, `object` = `group.component.element`,
         `base` = `category.concept.property`, `modifier` = `variant.state.scale.mode`.
 
   - type: dropdown
@@ -41,7 +41,7 @@ body:
     id: namespace
     attributes:
       label: Namespace (theme / domain)
-      description: Optional theme + domain — do **not** include the hierarchy keyword. In the Curtis Nathan model this maps to `system.theme.domain`, but the form value should only include the theme/domain portion.
+      description: Optional theme + domain — do **not** include the hierarchy keyword.
       placeholder: "light.color"
     validations:
       required: false

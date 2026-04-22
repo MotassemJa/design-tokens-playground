@@ -27,5 +27,5 @@ If `dist/` is missing or stale, run `npm run build` first.
 
 ## Scope
 
-The current UI is used to browse a minimal 5-layer token spike, not a large catalog.
+The current UI is used to browse a minimal 4-layer token spike, not a large catalog.
 

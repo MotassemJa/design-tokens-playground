@@ -30,7 +30,7 @@ Notes: There is no dedicated lint script. For a minimal build omitting specific 
   - `build-tokens.ts` — end-to-end build orchestration (load → validate → interpret → Style Dictionary → JSON output).
   - `token-loader.ts` — loads and merges `tokens/{hierarchy}/tokens.json`; enforces strict directory layout.
   - `token-reference-resolver.ts` — resolves `{path.to.token}` references for the resolved JSON artifact.
-  - `token-validator.ts` — enforces Curtis Nathan naming convention and 5-layer hierarchy reference rules.
+  - `token-validator.ts` — enforces Curtis Nathan naming convention and 4-layer hierarchy reference rules.
 - dist/ — generated artifacts consumed by downstream packages:
   - `dist/css/variables.css`, `dist/tokens.json`, `dist/tokens.resolved.json`, `dist/tokens.interpreted.json`, `dist/tokens.js`, `dist/tokens.d.ts`.
 - preview/ — static interactive token browser (preview/index.html) used to inspect tokens locally or via GitHub Pages.
@@ -47,16 +47,15 @@ Runtime targets: Node.js 20+, npm 10+ (see README/DEVELOPMENT.md and tsconfig.js
 - Token format: DTCG-style entries with required properties `"$value"` and `"$type"` (optionally `$description`, `$extensions`). Copilot should assume this format when suggesting token edits.
 - Token hierarchy: Exactly five layers — `design-values`, `universal`, `system`, `semantic`, `component`. Each layer lives in `tokens/{layer}/tokens.json`. No other directories or filenames are accepted.
 - Naming convention (Curtis Nathan): All token path segments are **lowercase kebab-case**. Path structure is `{namespace}.{object}.{base}.{modifier}` where the groups map to:
-  - `namespace` = `system.theme.domain` in the model; in actual token paths enter only the theme/domain portion (e.g. `light.color`)
+  - `namespace` = `system.theme.domain` (encodes the layer context, e.g. `system.light.color`)
   - `object` = `group.component.element` (e.g. `button.primary.text`)
   - `base` = `category.concept.property` (e.g. `color` or `space.padding`)
   - `modifier` = `variant.state.scale.mode` (e.g. `hover.on-light`)
-  - Hierarchy is selected separately by folder, workflow input, or CLI flag; do not prefix token paths with hierarchy names.
-  - `design-values` tokens may reference `design-values`.
-  - `universal` tokens may reference `design-values` or `universal`.
-  - `system` tokens may reference `design-values`, `universal`, or `system`.
-  - `semantic` tokens may reference `design-values`, `universal`, `system`, or `semantic`.
-  - `component` tokens may reference `design-values`, `universal`, `system`, `semantic`, or `component`.
+  - `design-values.*` references nothing (raw primitives).
+  - `universal.*` may only reference `design-values.*`.
+  - `system.*` may reference `design-values.*` or `universal.*`.
+  - `semantic.*` may reference `design-values.*`, `universal.*`, or `system.*`.
+  - `component.*` may reference `design-values.*`, `universal.*`, `system.*`, or `semantic.*`.
 - Token references: Use the `{path.to.token}` syntax to reference other tokens; the build pipeline resolves these into `tokens.resolved.json`.
 - Validation: Curtis Nathan naming and layer-reference rules are enforced by `src/token-validator.ts` at build time and by the Jest suite. Suggestions that modify tokens should keep `$type` values valid and `$value` formats consistent with `$type` (e.g. colors as hex/rgb/hsl).
 - Outputs and variants: Building supports flags to omit outputs (e.g. `--no-types`, `--no-json`, `--no-js`, `--no-css`) — use these to create minimal builds.
@@ -68,7 +67,7 @@ Runtime targets: Node.js 20+, npm 10+ (see README/DEVELOPMENT.md and tsconfig.js
 ## Files and places to check (quick pointers)
 
 - Build entry: `src/index.ts`
-- Token sources: `tokens/` (five subdirectories: `design-values/`, `universal/`, `system/`, `semantic/`, `component/`)
+- Token sources: `tokens/` (four subdirectories: `universal/`, `system/`, `semantic/`, `component/`)
 - Validation: `src/token-validator.ts` (used by build pipeline and `.github/scripts/token-common.ts`)
 - Scripts: `.github/scripts/` (create/update/delete token helpers, shared logic in `token-common.ts`)
 - CI: `.github/workflows/` (issue workflows, build, publish)
