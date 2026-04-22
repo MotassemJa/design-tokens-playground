@@ -16,11 +16,11 @@ export interface TokenGroup {
 const SEGMENT_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
 const HIERARCHY_ALLOWED_REFS: Record<Hierarchy, readonly Hierarchy[]> = {
-  "design-values": [],
-  universal: ["design-values"],
-  system: ["design-values", "universal"],
-  semantic: ["design-values", "universal", "system"],
-  component: ["design-values", "universal", "system", "semantic"],
+  "design-values": ["design-values"],
+  universal: ["design-values", "universal"],
+  system: ["design-values", "universal", "system"],
+  semantic: ["design-values", "universal", "system", "semantic"],
+  component: ["design-values", "universal", "system", "semantic", "component"],
 };
 
 const REFERENCE_PATTERN = /\{([^}]+)\}/g;
@@ -29,11 +29,12 @@ const REFERENCE_PATTERN = /\{([^}]+)\}/g;
  * Enforces:
  *  1. Curtis Nathan naming convention (kebab-case segments).
  *  2. 5-layer hierarchy reference rules (hierarchy determined by source file,
- *     not by path prefix). Each layer may reference any layer below it:
- *     design-values → (none), universal → design-values,
- *     system → design-values/universal,
- *     semantic → design-values/universal/system,
- *     component → design-values/universal/system/semantic.
+ *     not by path prefix). Each layer may reference itself and any layer below it:
+ *     design-values → design-values,
+ *     universal → design-values/universal,
+ *     system → design-values/universal/system,
+ *     semantic → design-values/universal/system/semantic,
+ *     component → design-values/universal/system/semantic/component.
  *
  * DTCG value-shape validation is delegated to TokenScript in the build
  * pipeline (`processTokens`).

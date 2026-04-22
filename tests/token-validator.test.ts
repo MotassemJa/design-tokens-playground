@@ -82,4 +82,30 @@ describe("TokenValidator", () => {
 
     expect(validator.validate(tokensByHierarchy)).toBe(true);
   });
+
+  it("allows references within the same hierarchy", () => {
+    const tokensByHierarchy = new Map<Hierarchy, TokenGroup>([
+      [
+        "system",
+        {
+          color: {
+            blue: {
+              500: {
+                $value: "#3B82F6",
+                $type: "color",
+              },
+              600: {
+                $value: "{color.blue.500}",
+                $type: "color",
+              },
+            },
+          },
+        },
+      ],
+    ]);
+    const validator = new TokenValidator();
+
+    expect(validator.validate(tokensByHierarchy)).toBe(true);
+    expect(validator.getErrors()).toEqual([]);
+  });
 });
