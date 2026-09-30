@@ -1,33 +1,5 @@
-import { jest } from "@jest/globals";
 import { assertTreeValid, type TokenTree } from "../.github/scripts/token-common.js";
-import { getFixtureDir } from "./test-helpers.js";
-
-/**
- * `assertTreeValid` exits the process on failure, so these tests trap
- * `process.exit` and turn it into a throw.
- */
-function captureExit(run: () => void): { exited: boolean; errors: string[] } {
-  const errors: string[] = [];
-  const exitSpy = jest.spyOn(process, "exit").mockImplementation((() => {
-    throw new Error("__exit__");
-  }) as never);
-  const errorSpy = jest.spyOn(console, "error").mockImplementation((...args) => {
-    errors.push(args.join(" "));
-  });
-
-  let exited = false;
-  try {
-    run();
-  } catch (error) {
-    if ((error as Error).message !== "__exit__") throw error;
-    exited = true;
-  } finally {
-    exitSpy.mockRestore();
-    errorSpy.mockRestore();
-  }
-
-  return { exited, errors };
-}
+import { captureExit, getFixtureDir } from "./test-helpers.js";
 
 const FIXTURE_ROOT = getFixtureDir("valid");
 

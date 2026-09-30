@@ -49,7 +49,7 @@ export function buildTokenPath(data: TokenData): string {
 /**
  * Returns the validated hierarchy for a TokenData payload.
  */
-export function getHierarchy(data: TokenData): Hierarchy {
+export function getHierarchy(data: { hierarchy: Hierarchy }): Hierarchy {
   const rawHierarchy = String(data.hierarchy ?? "").trim();
   const normalizedHierarchy = rawHierarchy
     .replace(/^\[+/, "")
@@ -68,8 +68,8 @@ export function getHierarchy(data: TokenData): Hierarchy {
 /**
  * Returns the single `tokens/{hierarchy}/tokens.json` file path.
  */
-export function getTokenFilePath(hierarchy: Hierarchy): string {
-  const dir = join(TOKENS_DIR, hierarchy);
+export function getTokenFilePath(hierarchy: Hierarchy, tokensRoot: string = TOKENS_DIR): string {
+  const dir = join(tokensRoot, hierarchy);
   if (!existsSync(dir)) {
     mkdirSync(dir, { recursive: true });
   }
@@ -154,15 +154,21 @@ export function cleanEmptyParents(tree: TokenTree, tokenPath: string): void {
 }
 
 /**
- * Validates a path against the Curtis Nathan convention. Exits on failure.
+ * Validates paths against the Curtis Nathan convention. Exits on failure,
+ * reporting every offending path — an import of 200 tokens should not need 200
+ * round-trips to surface 200 naming errors.
  */
-function assertValidPath(tokenPath: string): void {
-  const errors = TokenValidator.validatePath(tokenPath);
+export function assertValidPaths(tokenPaths: string[]): void {
+  const errors = tokenPaths.flatMap((p) => TokenValidator.validatePath(p));
   if (errors.length > 0) {
     console.error("❌ Invalid token path (Curtis Nathan naming convention):");
     errors.forEach((e) => console.error(`  - ${e}`));
     process.exit(1);
   }
+}
+
+function assertValidPath(tokenPath: string): void {
+  assertValidPaths([tokenPath]);
 }
 
 /**
@@ -271,4 +277,193 @@ export function deleteToken(data: TokenData): void {
   writeTokenFile(filePath, tree);
 
   console.log(`🗑️  Deleted token: ${tokenPath}`);
+}
+
+/**
+ * Input payload for an import request.
+ */
+export interface ImportData {
+  hierarchy: Hierarchy;
+  mode: "merge" | "replace";
+  /** Path to the DTCG JSON document to import. */
+  file: string;
+  /** Token root to write into. Defaults to the repository's `tokens/`. */
+  tokensRoot?: string;
+}
+
+export interface ImportSummary {
+  added: string[];
+  updated: string[];
+  removed: string[];
+  unchanged: string[];
+  changed: boolean;
+}
+
+/** Reports a fatal error and exits. Typed `never` so callers narrow correctly. */
+function fail(message: string): never {
+  console.error(message);
+  process.exit(1);
+}
+
+function isLeaf(node: unknown): boolean {
+  return !!node && typeof node === "object" && "$value" in (node as Record<string, unknown>);
+}
+
+function isDtcgMetadataKey(key: string): boolean {
+  return key.startsWith("$");
+}
+
+/**
+ * Records every addressable entry of a tree as `path -> serialized value`:
+ * token leaves, plus group-level DTCG metadata such as an inherited `$type`.
+ * Group metadata is included so that retyping a group is reported as a change
+ * rather than passing silently — the leaves below it are untouched but their
+ * effective type is not.
+ */
+function collectEntries(
+  node: TokenTree,
+  path: string[] = [],
+  out: Map<string, string> = new Map()
+): Map<string, string> {
+  if (isLeaf(node)) {
+    out.set(path.join("."), JSON.stringify(node));
+    return out;
+  }
+
+  for (const [key, child] of Object.entries(node)) {
+    const childPath = [...path, key];
+    if (isDtcgMetadataKey(key)) {
+      out.set(childPath.join("."), JSON.stringify(child));
+    } else if (child && typeof child === "object") {
+      collectEntries(child as TokenTree, childPath, out);
+    }
+  }
+
+  return out;
+}
+
+/** Every token path in a tree, ignoring DTCG metadata keys. */
+export function collectLeafPaths(node: TokenTree, path: string[] = [], out: string[] = []): string[] {
+  if (isLeaf(node)) {
+    out.push(path.join("."));
+    return out;
+  }
+
+  for (const [key, child] of Object.entries(node)) {
+    if (isDtcgMetadataKey(key)) continue;
+    if (child && typeof child === "object") {
+      collectLeafPaths(child as TokenTree, [...path, key], out);
+    }
+  }
+
+  return out;
+}
+
+/**
+ * Deep-merges `incoming` onto `target`, stopping at token leaves.
+ *
+ * A node carrying `$value` is replaced wholesale, never merged key by key:
+ * recursing into it would strand the previous `$type` / `$description` when the
+ * incoming document types the group instead of the leaf, which is exactly the
+ * stale metadata an override is meant to clear.
+ */
+export function mergeTokenTrees(target: TokenTree, incoming: TokenTree): TokenTree {
+  for (const [key, value] of Object.entries(incoming)) {
+    if (isDtcgMetadataKey(key) || isLeaf(value)) {
+      target[key] = value;
+      continue;
+    }
+
+    const existing = target[key];
+    if (!existing || typeof existing !== "object" || isLeaf(existing)) {
+      target[key] = {};
+    }
+    mergeTokenTrees(target[key] as TokenTree, value as TokenTree);
+  }
+
+  return target;
+}
+
+/** Renders an import summary as markdown for the PR body. */
+export function formatImportSummary(summary: ImportSummary, data: ImportData): string {
+  const cap = 50;
+  const section = (title: string, entries: string[]): string => {
+    if (entries.length === 0) return "";
+    const shown = entries.slice(0, cap).map((e) => `- \`${e}\``);
+    const rest = entries.length - shown.length;
+    if (rest > 0) shown.push(`- …and ${rest} more`);
+    return `### ${title} (${entries.length})\n${shown.join("\n")}\n\n`;
+  };
+
+  const header =
+    `**Hierarchy**: \`${data.hierarchy}\` · **Mode**: \`${data.mode}\`\n\n` +
+    `${summary.added.length} added, ${summary.updated.length} updated, ` +
+    `${summary.removed.length} removed, ${summary.unchanged.length} unchanged.\n\n`;
+
+  return (
+    header +
+    section("Added", summary.added) +
+    section("Updated", summary.updated) +
+    section("Removed", summary.removed)
+  ).trim();
+}
+
+/**
+ * Imports a DTCG JSON document into one hierarchy.
+ *
+ * The document is assumed DTCG-conform and is not normalized: `$type` stays on
+ * whichever group or token declared it, and the validator resolves inheritance.
+ */
+export function importTokens(data: ImportData): ImportSummary {
+  const tokensRoot = data.tokensRoot ?? TOKENS_DIR;
+  const hierarchy = getHierarchy(data);
+
+  if (!existsSync(data.file)) {
+    fail(`❌ Import file not found: ${data.file}`);
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(readFileSync(data.file, "utf8"));
+  } catch (error) {
+    fail(
+      `❌ Could not parse '${data.file}' as JSON: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    fail(`❌ '${data.file}' must contain a DTCG token object at the top level.`);
+  }
+  const incoming = parsed as TokenTree;
+
+  assertValidPaths(collectLeafPaths(incoming));
+
+  const filePath = getTokenFilePath(hierarchy, tokensRoot);
+  const before = collectEntries(readTokenFile(filePath));
+
+  const tree =
+    data.mode === "replace" ? incoming : mergeTokenTrees(readTokenFile(filePath), incoming);
+
+  const after = collectEntries(tree);
+
+  const summary: ImportSummary = {
+    added: [...after.keys()].filter((k) => !before.has(k)).sort(),
+    updated: [...after.keys()].filter((k) => before.has(k) && before.get(k) !== after.get(k)).sort(),
+    removed: [...before.keys()].filter((k) => !after.has(k)).sort(),
+    unchanged: [...after.keys()].filter((k) => before.get(k) === after.get(k)).sort(),
+    changed: false,
+  };
+  summary.changed =
+    summary.added.length > 0 || summary.updated.length > 0 || summary.removed.length > 0;
+
+  assertTreeValid(tree, hierarchy, tokensRoot);
+  writeTokenFile(filePath, tree);
+
+  console.log(
+    `✅ Imported into '${hierarchy}' (${data.mode}): ${summary.added.length} added, ` +
+      `${summary.updated.length} updated, ${summary.removed.length} removed, ` +
+      `${summary.unchanged.length} unchanged.`
+  );
+
+  return summary;
 }
