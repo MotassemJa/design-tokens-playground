@@ -12,8 +12,7 @@ const argv = await yargs(hideBin(process.argv))
   })
   .option("mode", {
     type: "string",
-    choices: ["merge", "replace"] as const,
-    default: "merge" as const,
+    default: "merge",
     description: "merge: overlay onto the existing file. replace: the file becomes this document.",
   })
   .option("file", {
