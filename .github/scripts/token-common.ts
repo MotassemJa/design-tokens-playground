@@ -47,15 +47,24 @@ export function buildTokenPath(data: TokenData): string {
 }
 
 /**
+ * Strips the brackets that issue-form dropdown values arrive wrapped in
+ * (`[system]`) and lowercases the result.
+ */
+export function normalizeChoice(raw: unknown): string {
+  return String(raw ?? "")
+    .trim()
+    .replace(/^\[+/, "")
+    .replace(/\]+$/, "")
+    .trim()
+    .toLowerCase();
+}
+
+/**
  * Returns the validated hierarchy for a TokenData payload.
  */
 export function getHierarchy(data: { hierarchy: Hierarchy }): Hierarchy {
   const rawHierarchy = String(data.hierarchy ?? "").trim();
-  const normalizedHierarchy = rawHierarchy
-    .replace(/^\[+/, "")
-    .replace(/\]+$/, "")
-    .trim()
-    .toLowerCase() as Hierarchy;
+  const normalizedHierarchy = normalizeChoice(rawHierarchy) as Hierarchy;
 
   if (!ALLOWED_HIERARCHIES.includes(normalizedHierarchy)) {
     throw new Error(
@@ -284,7 +293,8 @@ export function deleteToken(data: TokenData): void {
  */
 export interface ImportData {
   hierarchy: Hierarchy;
-  mode: "merge" | "replace";
+  /** `merge` or `replace`; tolerates the `[merge]` form dropdowns produce. */
+  mode: string;
   /** Path to the DTCG JSON document to import. */
   file: string;
   /** Token root to write into. Defaults to the repository's `tokens/`. */
@@ -396,7 +406,8 @@ export function formatImportSummary(summary: ImportSummary, data: ImportData): s
   };
 
   const header =
-    `**Hierarchy**: \`${data.hierarchy}\` · **Mode**: \`${data.mode}\`\n\n` +
+    `**Hierarchy**: \`${normalizeChoice(data.hierarchy)}\` · ` +
+    `**Mode**: \`${normalizeChoice(data.mode)}\`\n\n` +
     `${summary.added.length} added, ${summary.updated.length} updated, ` +
     `${summary.removed.length} removed, ${summary.unchanged.length} unchanged.\n\n`;
 
@@ -417,6 +428,11 @@ export function formatImportSummary(summary: ImportSummary, data: ImportData): s
 export function importTokens(data: ImportData): ImportSummary {
   const tokensRoot = data.tokensRoot ?? TOKENS_DIR;
   const hierarchy = getHierarchy(data);
+
+  const mode = normalizeChoice(data.mode);
+  if (mode !== "merge" && mode !== "replace") {
+    fail(`❌ Invalid mode '${data.mode}'. Allowed: merge, replace`);
+  }
 
   if (!existsSync(data.file)) {
     fail(`❌ Import file not found: ${data.file}`);
@@ -441,8 +457,7 @@ export function importTokens(data: ImportData): ImportSummary {
   const filePath = getTokenFilePath(hierarchy, tokensRoot);
   const before = collectEntries(readTokenFile(filePath));
 
-  const tree =
-    data.mode === "replace" ? incoming : mergeTokenTrees(readTokenFile(filePath), incoming);
+  const tree = mode === "replace" ? incoming : mergeTokenTrees(readTokenFile(filePath), incoming);
 
   const after = collectEntries(tree);
 
@@ -460,7 +475,7 @@ export function importTokens(data: ImportData): ImportSummary {
   writeTokenFile(filePath, tree);
 
   console.log(
-    `✅ Imported into '${hierarchy}' (${data.mode}): ${summary.added.length} added, ` +
+    `✅ Imported into '${hierarchy}' (${mode}): ${summary.added.length} added, ` +
       `${summary.updated.length} updated, ${summary.removed.length} removed, ` +
       `${summary.unchanged.length} unchanged.`
   );

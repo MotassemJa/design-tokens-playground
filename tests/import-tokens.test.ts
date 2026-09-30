@@ -198,11 +198,31 @@ describe("formatImportSummary", () => {
     const added = Array.from({ length: 53 }, (_, i) => `color.shade.${i}`);
     const markdown = formatImportSummary(
       { added, updated: [], removed: [], unchanged: [], changed: true },
-      { hierarchy: "universal", mode: "merge", file: "x.json" }
+      { hierarchy: "[universal]" as never, mode: "[MERGE]", file: "x.json" }
     );
 
     expect(markdown).toContain("### Added (53)");
+    expect(markdown).toContain("**Hierarchy**: `universal` · **Mode**: `merge`");
     expect(markdown).toContain("…and 3 more");
     expect(markdown).not.toContain("### Removed");
+  });
+});
+
+describe("importTokens — dropdown values", () => {
+  it("tolerates the bracketed form that issue-form dropdowns produce", () => {
+    const summary = runImport(
+      { color: { red: { 500: { $value: "#EF4444", $type: "color" } } } },
+      { mode: "[merge]", hierarchy: "[universal]" as never }
+    );
+
+    expect(summary.added).toEqual(["color.red.500"]);
+    expect((readHierarchy("universal") as any).color.blue["500"]).toBeDefined();
+  });
+
+  it("rejects an unknown mode", () => {
+    const { exited, errors } = captureExit(() => runImport({}, { mode: "overwrite" }));
+
+    expect(exited).toBe(true);
+    expect(errors.join("\n")).toContain("Invalid mode 'overwrite'");
   });
 });

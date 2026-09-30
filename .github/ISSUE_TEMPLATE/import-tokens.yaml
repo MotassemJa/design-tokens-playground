@@ -1,0 +1,112 @@
+name: 📥 Import Token File
+description: Import a whole DTCG JSON document into one hierarchy, overriding or adding tokens
+title: "[IMPORT] "
+labels: ["token-request", "import"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Import a DTCG Token File
+
+        Paste a **DTCG-conform** JSON document. It is written into the single
+        `tokens/{hierarchy}/tokens.json` file for the hierarchy you pick, and the
+        result is opened as a pull request.
+
+        The document is taken as-is — nothing is normalized or rewritten. In
+        particular `$type` may sit on a **group** and be inherited by everything
+        below it, which is the DTCG way:
+
+        ```json
+        {
+          "color": {
+            "$type": "color",
+            "green": {
+              "500": { "$value": "oklch(0.72 0.19 149)", "$description": "accent" },
+              "600": { "$value": "oklch(0.62 0.19 149)" }
+            }
+          }
+        }
+        ```
+
+        **Rules** (the same ones every token change obeys)
+
+        - Every path segment is lowercase `kebab-case` — `on-brand`, `primary-text`.
+        - Paths carry **no hierarchy prefix**; the hierarchy is the dropdown below.
+        - Each layer may reference only itself and layers **below** it:
+          `design-values` ← `universal` ← `system` ← `semantic` ← `component`.
+        - A reference is a hierarchy-less path: `{color.blue.500}`.
+
+        Malformed paths are all reported at once, so one run tells you everything
+        that needs fixing.
+
+  - type: dropdown
+    id: hierarchy
+    attributes:
+      label: Hierarchy
+      description: Which layer does this document belong to? One import writes one layer.
+      options:
+        - design-values
+        - universal
+        - system
+        - semantic
+        - component
+    validations:
+      required: true
+
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Mode
+      description: |
+        **merge** — overlay onto the existing file. Tokens you do not mention are kept;
+        tokens you do mention are replaced outright.
+
+        **replace** — the imported document becomes the whole file. Anything missing
+        from it is removed, and the import is rejected if another layer still
+        references what would go.
+      options:
+        - merge
+        - replace
+    validations:
+      required: true
+
+  - type: textarea
+    id: tokens-json
+    attributes:
+      label: DTCG JSON
+      description: The full document. GitHub caps an issue body at ~65,000 characters.
+      render: json
+      placeholder: |
+        {
+          "color": {
+            "$type": "color",
+            "green": { "500": { "$value": "oklch(0.72 0.19 149)" } }
+          }
+        }
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: Where does this document come from, and why is it being imported?
+      placeholder: "Refreshed green ramp exported from the brand palette review."
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: confirmation
+    attributes:
+      label: Pre-submission Checklist
+      options:
+        - label: The JSON is DTCG-conform and parses.
+          required: true
+        - label: All path segments are lowercase `kebab-case`, with no hierarchy prefix.
+          required: true
+        - label: Every `$value` reference points at this layer or one **below** it.
+          required: true
+        - label: Every token has a `$type`, on the token or on an ancestor group.
+          required: true
+        - label: I understand `replace` removes any token missing from this document.
+          required: true
