@@ -53,8 +53,6 @@ export interface TokenData {
   value?: string;
   tokenType?: string;
   description?: string;
-  /** Token root to operate on. Defaults to the repository's `tokens/`. */
-  tokensRoot?: string;
 }
 
 const TOKENS_DIR = join(process.cwd(), TOKENS_ROOT);
@@ -100,11 +98,8 @@ export function getHierarchy(data: { hierarchy: Hierarchy }): Hierarchy {
 /**
  * Returns the single `tokens/{hierarchy}/tokens.json` file path.
  */
-export function getTokenFilePath(
-  hierarchy: Hierarchy,
-  tokensRoot: string = TOKENS_DIR,
-): string {
-  const dir = join(tokensRoot, hierarchy);
+export function getTokenFilePath(hierarchy: Hierarchy): string {
+  const dir = join(TOKENS_DIR, hierarchy);
   if (!existsSync(dir)) {
     mkdirSync(dir, { recursive: true });
   }
@@ -227,19 +222,13 @@ function assertValidPath(tokenPath: string): void {
  * written. Validating the single tree in isolation is not enough: references
  * carry no hierarchy prefix, so any cross-layer `{ref}` would be reported as
  * missing and every operation outside `design-values` would fail.
- *
- * @param tokensRoot Token root to load the other hierarchies from. Defaults to
- * the repository's `tokens/` directory; tests point it at a fixture.
  */
-export function assertTreeValid(
-  tree: TokenTree,
-  hierarchy: Hierarchy,
-  tokensRoot: string = TOKENS_DIR,
-): void {
+export function assertTreeValid(tree: TokenTree, hierarchy: Hierarchy): void {
   const validator = new TokenValidator();
-  const byHierarchy = new TokenLoader(
-    tokensRoot,
-  ).loadTokensByHierarchy() as Map<Hierarchy, TokenGroup>;
+  const byHierarchy = new TokenLoader().loadTokensByHierarchy() as Map<
+    Hierarchy,
+    TokenGroup
+  >;
   byHierarchy.set(hierarchy, tree as TokenGroup);
   if (!validator.validate(byHierarchy)) {
     console.error("❌ Token validation failed:");
@@ -256,9 +245,8 @@ export function createToken(data: TokenData): void {
   const tokenPath = buildTokenPath(data);
   assertValidPath(tokenPath);
 
-  const tokensRoot = data.tokensRoot ?? TOKENS_DIR;
   const hierarchy = getHierarchy(data);
-  const filePath = getTokenFilePath(hierarchy, tokensRoot);
+  const filePath = getTokenFilePath(hierarchy);
   const tree = readTokenFile(filePath);
 
   if (getNested(tree, tokenPath)) {
@@ -273,7 +261,7 @@ export function createToken(data: TokenData): void {
   if (data.description) leaf.$description = data.description;
 
   setNested(tree, tokenPath, leaf);
-  assertTreeValid(tree, hierarchy, tokensRoot);
+  assertTreeValid(tree, hierarchy);
   writeTokenFile(filePath, tree);
 
   console.log(`✅ Created token: ${tokenPath}`);
@@ -286,9 +274,8 @@ export function updateToken(data: TokenData): void {
   const tokenPath = buildTokenPath(data);
   assertValidPath(tokenPath);
 
-  const tokensRoot = data.tokensRoot ?? TOKENS_DIR;
   const hierarchy = getHierarchy(data);
-  const filePath = getTokenFilePath(hierarchy, tokensRoot);
+  const filePath = getTokenFilePath(hierarchy);
   const tree = readTokenFile(filePath);
 
   const existing = getNested(tree, tokenPath);
@@ -308,7 +295,7 @@ export function updateToken(data: TokenData): void {
   if (data.description) leaf.$description = data.description;
 
   setNested(tree, tokenPath, leaf);
-  assertTreeValid(tree, hierarchy, tokensRoot);
+  assertTreeValid(tree, hierarchy);
   writeTokenFile(filePath, tree);
 
   console.log(`✅ Updated token: ${tokenPath}`);
@@ -321,9 +308,8 @@ export function deleteToken(data: TokenData): void {
   const tokenPath = buildTokenPath(data);
   assertValidPath(tokenPath);
 
-  const tokensRoot = data.tokensRoot ?? TOKENS_DIR;
   const hierarchy = getHierarchy(data);
-  const filePath = getTokenFilePath(hierarchy, tokensRoot);
+  const filePath = getTokenFilePath(hierarchy);
   const tree = readTokenFile(filePath);
 
   if (!getNested(tree, tokenPath)) {
@@ -335,7 +321,7 @@ export function deleteToken(data: TokenData): void {
   cleanEmptyParents(tree, tokenPath);
   // Deleting a token another layer still references would ship a tree that
   // cannot build, so the delete is validated like any other write.
-  assertTreeValid(tree, hierarchy, tokensRoot);
+  assertTreeValid(tree, hierarchy);
   writeTokenFile(filePath, tree);
 
   console.log(`🗑️  Deleted token: ${tokenPath}`);
@@ -350,8 +336,6 @@ export interface ImportData {
   mode: string;
   /** Path to the DTCG JSON document to import. */
   file: string;
-  /** Token root to write into. Defaults to the repository's `tokens/`. */
-  tokensRoot?: string;
 }
 
 export interface ImportSummary {
@@ -493,7 +477,6 @@ export function formatImportSummary(
  * whichever group or token declared it, and the validator resolves inheritance.
  */
 export function importTokens(data: ImportData): ImportSummary {
-  const tokensRoot = data.tokensRoot ?? TOKENS_DIR;
   const hierarchy = getHierarchy(data);
 
   const mode = normalizeChoice(data.mode);
@@ -523,7 +506,7 @@ export function importTokens(data: ImportData): ImportSummary {
 
   assertValidPaths(collectLeafPaths(incoming));
 
-  const filePath = getTokenFilePath(hierarchy, tokensRoot);
+  const filePath = getTokenFilePath(hierarchy);
   const before = collectEntries(readTokenFile(filePath));
 
   const tree =
@@ -549,7 +532,7 @@ export function importTokens(data: ImportData): ImportSummary {
     summary.updated.length > 0 ||
     summary.removed.length > 0;
 
-  assertTreeValid(tree, hierarchy, tokensRoot);
+  assertTreeValid(tree, hierarchy);
   writeTokenFile(filePath, tree);
 
   console.log(

@@ -1,9 +1,13 @@
-import { jest } from "@jest/globals";
+import { spawnSync } from "node:child_process";
+import { cpSync, mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { TokenLoader, type Hierarchy } from "../src/token-loader.js";
 import { TokenValidator, type TokenGroup } from "../src/token-validator.js";
 
-const FIXTURES_DIR = join(process.cwd(), "tests", "fixtures");
+const REPO_ROOT = process.cwd();
+const FIXTURES_DIR = join(REPO_ROOT, "tests", "fixtures");
+const TSX = join(REPO_ROOT, "node_modules", ".bin", "tsx");
 
 export function getFixtureDir(name: string): string {
   return join(FIXTURES_DIR, name);
@@ -24,28 +28,35 @@ export function validateFixture(name: string): TokenValidator {
 }
 
 /**
- * Runs `run`, trapping the `process.exit(1)` that the issue-ops scripts use to
- * report a fatal error, and collecting what they printed to stderr.
+ * Creates a throwaway working directory holding a copy of a token fixture at
+ * `tokens/`, ready to be used as the cwd for an issue-ops script.
  */
-export function captureExit(run: () => void): { exited: boolean; errors: string[] } {
-  const errors: string[] = [];
-  const exitSpy = jest.spyOn(process, "exit").mockImplementation((() => {
-    throw new Error("__exit__");
-  }) as never);
-  const errorSpy = jest.spyOn(console, "error").mockImplementation((...args) => {
-    errors.push(args.join(" "));
+export function createTokenWorkspace(fixture = "valid"): string {
+  const dir = mkdtempSync(join(tmpdir(), "issue-ops-"));
+  cpSync(getFixtureDir(fixture), join(dir, "tokens"), { recursive: true });
+  return dir;
+}
+
+export interface ScriptResult {
+  status: number;
+  stdout: string;
+  stderr: string;
+  /** stdout and stderr combined, for asserting on a message either may carry. */
+  output: string;
+}
+
+/**
+ * Runs an issue-ops script the way a workflow does — as its own process, with
+ * the workspace as cwd. The scripts resolve `tokens/` from `process.cwd()` at
+ * module load, so this is what lets them be exercised against a fixture.
+ */
+export function runScript(script: string, args: string[], cwd: string): ScriptResult {
+  const result = spawnSync(TSX, [join(REPO_ROOT, ".github", "scripts", script), ...args], {
+    cwd,
+    encoding: "utf8",
   });
 
-  let exited = false;
-  try {
-    run();
-  } catch (error) {
-    if ((error as Error).message !== "__exit__") throw error;
-    exited = true;
-  } finally {
-    exitSpy.mockRestore();
-    errorSpy.mockRestore();
-  }
-
-  return { exited, errors };
+  const stdout = result.stdout ?? "";
+  const stderr = result.stderr ?? "";
+  return { status: result.status ?? 1, stdout, stderr, output: stdout + stderr };
 }
