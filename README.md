@@ -70,6 +70,7 @@ npm run build -- --no-references
 
 ```text
 tokens/
+  design-values/tokens.json
   universal/tokens.json
   system/tokens.json
   semantic/tokens.json
@@ -85,19 +86,22 @@ src/
 
 tests/
   fixtures/
-    valid/                  # happy-path fixture (all 4 layers)
+    valid/                  # happy-path fixture (all 5 layers)
     invalid-naming/         # breaks Curtis Nathan kebab-case rule
     invalid-hierarchy/      # universal token referencing another layer
     invalid-reference/      # unresolved {path.to.token}
   token-loader.test.ts
   token-validator.test.ts
   token-pipeline.test.ts
+  token-common.test.ts
+  import-tokens.test.ts
 
 .github/scripts/
   token-common.ts
   create-token.ts
   update-token.ts
   delete-token.ts
+  import-tokens.ts
 ```
 
 ## Token Naming — Curtis Nathan convention
@@ -212,5 +216,49 @@ runtime pipeline.
 
 ## Automation
 
-GitHub workflows in `.github/workflows/` support create, update, and delete token requests via issue templates and helper scripts under `.github/scripts/`.
+GitHub workflows in `.github/workflows/` support create, update, delete, and import
+token requests via issue templates and helper scripts under `.github/scripts/`.
+Every request lands as a pull request, never a direct push to `main`. See
+`.github/WORKFLOWS_README.md`.
+
+### Importing a token file
+
+The **📥 Import Token File** issue template takes a whole DTCG JSON document and
+writes it into one hierarchy:
+
+- **merge** (default) overlays the document. Tokens you do not mention are kept;
+  tokens you do mention are replaced outright, so a stale `$type` or
+  `$description` does not linger.
+- **replace** makes the document the whole file. Anything missing from it is
+  removed, and the import is rejected if another layer still references what
+  would go.
+
+The document is taken as DTCG-conform and is not normalized — in particular
+`$type` may sit on a **group** and be inherited by everything below it:
+
+```json
+{
+  "color": {
+    "$type": "color",
+    "green": {
+      "500": { "$value": "oklch(0.72 0.19 149)", "$description": "accent" },
+      "600": { "$value": "oklch(0.62 0.19 149)" }
+    }
+  }
+}
+```
+
+Paths carry no hierarchy prefix, every segment is lowercase `kebab-case`, and a
+layer may reference only itself and layers below it. Malformed paths are all
+reported in one run.
+
+The same import can be run locally:
+
+```bash
+npx tsx .github/scripts/import-tokens.ts \
+  --hierarchy universal \
+  --mode merge \
+  --file ./my-tokens.json \
+  --summary /tmp/summary.md
+```
 
