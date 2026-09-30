@@ -95,7 +95,7 @@ dist/css/variables.css       --ds-probe-surface-tint: var(--ds-light-color-surfa
 dist/tokens.resolved.json    "tint": { "$value": "oklch(0.95 0.006 240)" }
 ```
 
-### 2.3 `deleteToken` never validates — adjacent, one line, your call
+### 2.3 `deleteToken` never validates
 
 Not required for import, but surfaced while checking it. `deleteToken` writes the
 file without calling `assertTreeValid` at all, so deleting a token another layer
@@ -108,7 +108,8 @@ $ npm run build   →  ❌ Token validation failed:
 ```
 
 The fix is one `assertTreeValid(tree, hierarchy)` call before `writeTokenFile`,
-reusing §2.1. Flagged rather than folded in — it widens scope beyond import.
+reusing §2.1. A rejected delete leaves the file untouched, since validation runs
+before the write.
 
 Each fix lands as its own commit, bisectable independently of import.
 

@@ -32,6 +32,8 @@ export interface TokenData {
   value?: string;
   tokenType?: string;
   description?: string;
+  /** Token root to operate on. Defaults to the repository's `tokens/`. */
+  tokensRoot?: string;
 }
 
 const TOKENS_DIR = join(process.cwd(), TOKENS_ROOT);
@@ -217,8 +219,9 @@ export function createToken(data: TokenData): void {
   const tokenPath = buildTokenPath(data);
   assertValidPath(tokenPath);
 
+  const tokensRoot = data.tokensRoot ?? TOKENS_DIR;
   const hierarchy = getHierarchy(data);
-  const filePath = getTokenFilePath(hierarchy);
+  const filePath = getTokenFilePath(hierarchy, tokensRoot);
   const tree = readTokenFile(filePath);
 
   if (getNested(tree, tokenPath)) {
@@ -231,7 +234,7 @@ export function createToken(data: TokenData): void {
   if (data.description) leaf.$description = data.description;
 
   setNested(tree, tokenPath, leaf);
-  assertTreeValid(tree, hierarchy);
+  assertTreeValid(tree, hierarchy, tokensRoot);
   writeTokenFile(filePath, tree);
 
   console.log(`✅ Created token: ${tokenPath}`);
@@ -244,8 +247,9 @@ export function updateToken(data: TokenData): void {
   const tokenPath = buildTokenPath(data);
   assertValidPath(tokenPath);
 
+  const tokensRoot = data.tokensRoot ?? TOKENS_DIR;
   const hierarchy = getHierarchy(data);
-  const filePath = getTokenFilePath(hierarchy);
+  const filePath = getTokenFilePath(hierarchy, tokensRoot);
   const tree = readTokenFile(filePath);
 
   const existing = getNested(tree, tokenPath);
@@ -259,7 +263,7 @@ export function updateToken(data: TokenData): void {
   leaf.$description = data.description ?? (existing as TokenLeaf).$description;
 
   setNested(tree, tokenPath, leaf);
-  assertTreeValid(tree, hierarchy);
+  assertTreeValid(tree, hierarchy, tokensRoot);
   writeTokenFile(filePath, tree);
 
   console.log(`✅ Updated token: ${tokenPath}`);
@@ -272,8 +276,9 @@ export function deleteToken(data: TokenData): void {
   const tokenPath = buildTokenPath(data);
   assertValidPath(tokenPath);
 
+  const tokensRoot = data.tokensRoot ?? TOKENS_DIR;
   const hierarchy = getHierarchy(data);
-  const filePath = getTokenFilePath(hierarchy);
+  const filePath = getTokenFilePath(hierarchy, tokensRoot);
   const tree = readTokenFile(filePath);
 
   if (!getNested(tree, tokenPath)) {
@@ -283,6 +288,9 @@ export function deleteToken(data: TokenData): void {
 
   deleteNested(tree, tokenPath);
   cleanEmptyParents(tree, tokenPath);
+  // Deleting a token another layer still references would ship a tree that
+  // cannot build, so the delete is validated like any other write.
+  assertTreeValid(tree, hierarchy, tokensRoot);
   writeTokenFile(filePath, tree);
 
   console.log(`🗑️  Deleted token: ${tokenPath}`);
