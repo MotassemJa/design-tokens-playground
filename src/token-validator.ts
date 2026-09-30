@@ -9,7 +9,9 @@ export interface DesignTokenValue {
 }
 
 export interface TokenGroup {
-  [key: string]: DesignTokenValue | TokenGroup;
+  [key: string]: DesignTokenValue | TokenGroup | string | undefined;
+  /** DTCG group-level type, inherited by every descendant without its own. */
+  $type?: string;
 }
 
 /** Kebab-case segment: lowercase letters/digits, optional `-` between runs. */
@@ -24,6 +26,11 @@ const HIERARCHY_ALLOWED_REFS: Record<Hierarchy, readonly Hierarchy[]> = {
 };
 
 const REFERENCE_PATTERN = /\{([^}]+)\}/g;
+
+/** DTCG metadata keys (`$type`, `$description`, …) are never path segments. */
+function isDtcgMetadataKey(key: string): boolean {
+  return key.startsWith("$");
+}
 
 /**
  * Enforces:
@@ -111,6 +118,7 @@ export class TokenValidator {
       return;
     }
     for (const [key, child] of Object.entries(node)) {
+      if (isDtcgMetadataKey(key)) continue;
       this.collectPaths(child as TokenGroup, [...path, key], hierarchy, out);
     }
   }
@@ -119,16 +127,22 @@ export class TokenValidator {
     node: TokenGroup | DesignTokenValue,
     path: string[],
     hierarchy: Hierarchy,
-    pathToHierarchy: Map<string, Hierarchy>
+    pathToHierarchy: Map<string, Hierarchy>,
+    inheritedType?: string
   ): void {
     if (!node || typeof node !== "object") return;
 
     if (this.isTokenLeaf(node)) {
-      this.validateLeaf(node as DesignTokenValue, path, hierarchy, pathToHierarchy);
+      this.validateLeaf(node as DesignTokenValue, path, hierarchy, pathToHierarchy, inheritedType);
       return;
     }
 
+    // DTCG: a group's $type is inherited by every descendant that has none.
+    const groupType = (node as TokenGroup).$type;
+    const effectiveType = typeof groupType === "string" ? groupType : inheritedType;
+
     for (const [key, child] of Object.entries(node)) {
+      if (isDtcgMetadataKey(key)) continue;
       const childPath = [...path, key];
 
       if (!SEGMENT_PATTERN.test(key)) {
@@ -137,7 +151,7 @@ export class TokenValidator {
         );
       }
 
-      this.walk(child as TokenGroup, childPath, hierarchy, pathToHierarchy);
+      this.walk(child as TokenGroup, childPath, hierarchy, pathToHierarchy, effectiveType);
     }
   }
 
@@ -153,15 +167,18 @@ export class TokenValidator {
     token: DesignTokenValue,
     path: string[],
     hierarchy: Hierarchy,
-    pathToHierarchy: Map<string, Hierarchy>
+    pathToHierarchy: Map<string, Hierarchy>,
+    inheritedType?: string
   ): void {
     const pathStr = path.join(".");
 
     if (!("$value" in token)) {
       this.errors.push(`Token '${pathStr}' is missing required $value.`);
     }
-    if (!token.$type) {
-      this.errors.push(`Token '${pathStr}' is missing required $type.`);
+    if (!token.$type && !inheritedType) {
+      this.errors.push(
+        `Token '${pathStr}' is missing required $type (not set on the token or any ancestor group).`
+      );
     }
     if (token.$description !== undefined && typeof token.$description !== "string") {
       this.errors.push(`Token '${pathStr}': $description must be a string.`);
