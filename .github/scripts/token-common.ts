@@ -4,6 +4,7 @@ import {
   ALLOWED_HIERARCHIES,
   TOKEN_FILENAME,
   TOKENS_ROOT,
+  TokenLoader,
   type Hierarchy,
 } from "../../src/token-loader.ts";
 import { TokenValidator, type TokenGroup } from "../../src/token-validator.ts";
@@ -165,12 +166,27 @@ function assertValidPath(tokenPath: string): void {
 }
 
 /**
- * Validates full token tree after an operation. Exits on failure.
- * Wraps the single-hierarchy tree into the Map form expected by TokenValidator.
+ * Validates the token tree after an operation. Exits on failure.
+ *
+ * Loads every hierarchy and overlays the modified tree for the one being
+ * written. Validating the single tree in isolation is not enough: references
+ * carry no hierarchy prefix, so any cross-layer `{ref}` would be reported as
+ * missing and every operation outside `design-values` would fail.
+ *
+ * @param tokensRoot Token root to load the other hierarchies from. Defaults to
+ * the repository's `tokens/` directory; tests point it at a fixture.
  */
-function assertTreeValid(tree: TokenTree, hierarchy: Hierarchy): void {
+export function assertTreeValid(
+  tree: TokenTree,
+  hierarchy: Hierarchy,
+  tokensRoot: string = TOKENS_DIR
+): void {
   const validator = new TokenValidator();
-  const byHierarchy = new Map([[hierarchy, tree as TokenGroup]]);
+  const byHierarchy = new TokenLoader(tokensRoot).loadTokensByHierarchy() as Map<
+    Hierarchy,
+    TokenGroup
+  >;
+  byHierarchy.set(hierarchy, tree as TokenGroup);
   if (!validator.validate(byHierarchy)) {
     console.error("❌ Token validation failed:");
     validator.getErrors().forEach((e) => console.error(`  - ${e}`));

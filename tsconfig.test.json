@@ -4,6 +4,8 @@
     "rootDir": ".",
     "noEmit": true,
     "isolatedModules": true,
+    // `.github/scripts/*.ts` is pulled in by tests and imports with `.ts` specifiers.
+    "allowImportingTsExtensions": true,
     "types": ["node", "jest"]
   },
   "include": ["src/**/*", "tests/**/*"]
