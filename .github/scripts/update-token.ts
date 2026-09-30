@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
-import { updateToken, type TokenData } from "./token-common";
+import { updateToken, exitOnError, parseHierarchy, type TokenData } from "./token-common";
 
 const argv = await yargs(hideBin(process.argv))
   .option("hierarchy", { type: "string", demandOption: true })
@@ -17,7 +17,7 @@ const argv = await yargs(hideBin(process.argv))
 
 const data: TokenData = {
   action: "update",
-  hierarchy: argv.hierarchy as TokenData["hierarchy"],
+  hierarchy: exitOnError(() => parseHierarchy(argv.hierarchy)),
   namespace: argv.namespace,
   object: argv.object,
   base: argv.base,

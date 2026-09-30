@@ -2,6 +2,9 @@ import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   formatImportSummary,
+  parseDropdownValue,
+  parseHierarchy,
+  parseImportMode,
   type TokenTree,
 } from "../.github/scripts/token-common.js";
 import { createTokenWorkspace, runScript, type ScriptResult } from "./test-helpers.js";
@@ -277,12 +280,63 @@ describe("formatImportSummary", () => {
     const added = Array.from({ length: 53 }, (_, i) => `color.shade.${i}`);
     const markdown = formatImportSummary(
       { added, updated: [], removed: [], unchanged: [], changed: true },
-      { hierarchy: "[universal]" as never, mode: "[MERGE]", file: "x.json" },
+      { hierarchy: "universal", mode: "merge", file: "x.json" },
     );
 
     expect(markdown).toContain("### Added (53)");
     expect(markdown).toContain("**Hierarchy**: `universal` · **Mode**: `merge`");
     expect(markdown).toContain("…and 3 more");
     expect(markdown).not.toContain("### Removed");
+  });
+});
+
+
+describe("parseDropdownValue", () => {
+  it.each([
+    ["merge", "merge"],
+    ["MERGE", "merge"],
+    ["  merge  ", "merge"],
+    // issue-ops/parser emits a dropdown as a JSON array.
+    ['["merge"]', "merge"],
+    ['[ "Merge" ]', "merge"],
+    ['["universal","ignored"]', "universal"],
+    // the bare bracketed form the original scripts defended against
+    ["[merge]", "merge"],
+    ["[UNIVERSAL]", "universal"],
+  ])("reads %j as %j", (raw, expected) => {
+    expect(parseDropdownValue(raw)).toBe(expected);
+  });
+
+  it("reads an empty or missing value as the empty string", () => {
+    expect(parseDropdownValue(undefined)).toBe("");
+    expect(parseDropdownValue("")).toBe("");
+    expect(parseDropdownValue("[]")).toBe("");
+  });
+});
+
+describe("parseHierarchy", () => {
+  it("accepts every allowed hierarchy, in any dropdown shape", () => {
+    expect(parseHierarchy("design-values")).toBe("design-values");
+    expect(parseHierarchy('["component"]')).toBe("component");
+    expect(parseHierarchy("[System]")).toBe("system");
+  });
+
+  it("rejects anything else, naming what is allowed", () => {
+    expect(() => parseHierarchy("made-up")).toThrow(/Invalid hierarchy 'made-up'/);
+    expect(() => parseHierarchy("made-up")).toThrow(/design-values, universal/);
+    expect(() => parseHierarchy("")).toThrow(/Invalid hierarchy/);
+  });
+});
+
+describe("parseImportMode", () => {
+  it("accepts both modes, in any dropdown shape", () => {
+    expect(parseImportMode("merge")).toBe("merge");
+    expect(parseImportMode('["replace"]')).toBe("replace");
+    expect(parseImportMode("[Merge]")).toBe("merge");
+  });
+
+  it("rejects anything else, naming what is allowed", () => {
+    expect(() => parseImportMode("overwrite")).toThrow(/Invalid mode 'overwrite'/);
+    expect(() => parseImportMode("overwrite")).toThrow(/merge, replace/);
   });
 });

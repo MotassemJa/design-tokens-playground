@@ -67,13 +67,35 @@ export function buildTokenPath(data: TokenData): string {
   return parts.join(".");
 }
 
+/** Reports a fatal error and exits. Typed `never` so callers narrow correctly. */
+function fail(message: string): never {
+  console.error(message);
+  process.exit(1);
+}
+
 /**
- * Strips the brackets that issue-form dropdown values arrive wrapped in
- * (`[system]`) and lowercases the result.
+ * Reads a single value out of an issue-form dropdown.
+ *
+ * `issue-ops/parser` emits a dropdown as a JSON array (`["universal"]`), and
+ * older forms of it as a bare bracketed value (`[universal]`). Both shapes, and
+ * a plain string, normalize to the lowercase option text.
  */
-export function normalizeChoice(raw: unknown): string {
-  return String(raw ?? "")
-    .trim()
+export function parseDropdownValue(raw: unknown): string {
+  const text = String(raw ?? "").trim();
+  if (!text.startsWith("[")) return text.toLowerCase();
+
+  try {
+    const parsed = JSON.parse(text);
+    if (Array.isArray(parsed)) {
+      return String(parsed[0] ?? "")
+        .trim()
+        .toLowerCase();
+    }
+  } catch {
+    // Not JSON — fall through and treat it as the bare `[universal]` form.
+  }
+
+  return text
     .replace(/^\[+/, "")
     .replace(/\]+$/, "")
     .trim()
@@ -81,18 +103,47 @@ export function normalizeChoice(raw: unknown): string {
 }
 
 /**
- * Returns the validated hierarchy for a TokenData payload.
+ * Validates a raw hierarchy at the process boundary, so everything behind it
+ * holds a real {@link Hierarchy} rather than whatever the form produced.
  */
-export function getHierarchy(data: { hierarchy: Hierarchy }): Hierarchy {
-  const rawHierarchy = String(data.hierarchy ?? "").trim();
-  const normalizedHierarchy = normalizeChoice(rawHierarchy) as Hierarchy;
-
-  if (!ALLOWED_HIERARCHIES.includes(normalizedHierarchy)) {
+export function parseHierarchy(raw: unknown): Hierarchy {
+  const value = parseDropdownValue(raw) as Hierarchy;
+  if (!ALLOWED_HIERARCHIES.includes(value)) {
     throw new Error(
-      `Invalid hierarchy '${rawHierarchy}'. Allowed: ${ALLOWED_HIERARCHIES.join(", ")}`,
+      `Invalid hierarchy '${String(raw)}'. Allowed: ${ALLOWED_HIERARCHIES.join(", ")}`,
     );
   }
-  return normalizedHierarchy;
+  return value;
+}
+
+/**
+ * Runs a boundary parser, turning the error it throws into the same `❌ …` and
+ * exit code every other failure in these scripts uses. The parsers throw rather
+ * than exit so they stay ordinary functions; the CLI wrapper is where a process
+ * is allowed to end.
+ */
+export function exitOnError<T>(run: () => T): T {
+  try {
+    return run();
+  } catch (error) {
+    return fail(`❌ ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+/** The modes an import can run in. */
+export const IMPORT_MODES = ["merge", "replace"] as const;
+
+export type ImportMode = (typeof IMPORT_MODES)[number];
+
+/** Validates a raw import mode at the process boundary. */
+export function parseImportMode(raw: unknown): ImportMode {
+  const value = parseDropdownValue(raw) as ImportMode;
+  if (!IMPORT_MODES.includes(value)) {
+    throw new Error(
+      `Invalid mode '${String(raw)}'. Allowed: ${IMPORT_MODES.join(", ")}`,
+    );
+  }
+  return value;
 }
 
 /**
@@ -245,7 +296,7 @@ export function createToken(data: TokenData): void {
   const tokenPath = buildTokenPath(data);
   assertValidPath(tokenPath);
 
-  const hierarchy = getHierarchy(data);
+  const hierarchy = data.hierarchy;
   const filePath = getTokenFilePath(hierarchy);
   const tree = readTokenFile(filePath);
 
@@ -274,7 +325,7 @@ export function updateToken(data: TokenData): void {
   const tokenPath = buildTokenPath(data);
   assertValidPath(tokenPath);
 
-  const hierarchy = getHierarchy(data);
+  const hierarchy = data.hierarchy;
   const filePath = getTokenFilePath(hierarchy);
   const tree = readTokenFile(filePath);
 
@@ -308,7 +359,7 @@ export function deleteToken(data: TokenData): void {
   const tokenPath = buildTokenPath(data);
   assertValidPath(tokenPath);
 
-  const hierarchy = getHierarchy(data);
+  const hierarchy = data.hierarchy;
   const filePath = getTokenFilePath(hierarchy);
   const tree = readTokenFile(filePath);
 
@@ -332,8 +383,7 @@ export function deleteToken(data: TokenData): void {
  */
 export interface ImportData {
   hierarchy: Hierarchy;
-  /** `merge` or `replace`; tolerates the `[merge]` form dropdowns produce. */
-  mode: string;
+  mode: ImportMode;
   /** Path to the DTCG JSON document to import. */
   file: string;
 }
@@ -344,12 +394,6 @@ export interface ImportSummary {
   removed: string[];
   unchanged: string[];
   changed: boolean;
-}
-
-/** Reports a fatal error and exits. Typed `never` so callers narrow correctly. */
-function fail(message: string): never {
-  console.error(message);
-  process.exit(1);
 }
 
 function isLeaf(node: unknown): boolean {
@@ -457,8 +501,7 @@ export function formatImportSummary(
   };
 
   const header =
-    `**Hierarchy**: \`${normalizeChoice(data.hierarchy)}\` · ` +
-    `**Mode**: \`${normalizeChoice(data.mode)}\`\n\n` +
+    `**Hierarchy**: \`${data.hierarchy}\` · **Mode**: \`${data.mode}\`\n\n` +
     `${summary.added.length} added, ${summary.updated.length} updated, ` +
     `${summary.removed.length} removed, ${summary.unchanged.length} unchanged.\n\n`;
 
@@ -477,12 +520,7 @@ export function formatImportSummary(
  * whichever group or token declared it, and the validator resolves inheritance.
  */
 export function importTokens(data: ImportData): ImportSummary {
-  const hierarchy = getHierarchy(data);
-
-  const mode = normalizeChoice(data.mode);
-  if (mode !== "merge" && mode !== "replace") {
-    fail(`❌ Invalid mode '${data.mode}'. Allowed: merge, replace`);
-  }
+  const hierarchy = data.hierarchy;
 
   if (!existsSync(data.file)) {
     fail(`❌ Import file not found: ${data.file}`);
@@ -510,7 +548,7 @@ export function importTokens(data: ImportData): ImportSummary {
   const before = collectEntries(readTokenFile(filePath));
 
   const tree =
-    mode === "replace"
+    data.mode === "replace"
       ? incoming
       : mergeTokenTrees(readTokenFile(filePath), incoming);
 
@@ -536,7 +574,7 @@ export function importTokens(data: ImportData): ImportSummary {
   writeTokenFile(filePath, tree);
 
   console.log(
-    `✅ Imported into '${hierarchy}' (${mode}): ${summary.added.length} added, ` +
+    `✅ Imported into '${hierarchy}' (${data.mode}): ${summary.added.length} added, ` +
       `${summary.updated.length} updated, ${summary.removed.length} removed, ` +
       `${summary.unchanged.length} unchanged.`,
   );

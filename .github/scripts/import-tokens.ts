@@ -2,7 +2,14 @@
 import { writeFileSync } from "node:fs";
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
-import { formatImportSummary, importTokens, type ImportData } from "./token-common";
+import {
+  formatImportSummary,
+  importTokens,
+  exitOnError,
+  parseHierarchy,
+  parseImportMode,
+  type ImportData,
+} from "./token-common";
 
 const argv = await yargs(hideBin(process.argv))
   .option("hierarchy", {
@@ -28,8 +35,8 @@ const argv = await yargs(hideBin(process.argv))
   .parseAsync();
 
 const data: ImportData = {
-  hierarchy: argv.hierarchy as ImportData["hierarchy"],
-  mode: argv.mode,
+  hierarchy: exitOnError(() => parseHierarchy(argv.hierarchy)),
+  mode: exitOnError(() => parseImportMode(argv.mode)),
   file: argv.file,
 };
 
