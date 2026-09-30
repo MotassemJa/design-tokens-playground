@@ -6,17 +6,38 @@ import {
   TOKENS_ROOT,
   TokenLoader,
   type Hierarchy,
-} from "../../src/token-loader.ts";
-import { TokenValidator, type TokenGroup } from "../../src/token-validator.ts";
+} from "../../src/token-loader";
+import {
+  TokenValidator,
+  type DesignTokenValue,
+  type TokenGroup,
+} from "../../src/token-validator";
 
-export interface TokenLeaf {
-  $value: unknown;
+/**
+ * A DTCG token: `$value` plus the reserved properties `$type`,
+ * `$description`, `$extensions` and `$deprecated`. Aliased to the build
+ * pipeline's type so the two cannot drift — a leaf the validator accepts is a
+ * leaf these scripts can write.
+ */
+export type TokenLeaf = DesignTokenValue;
+
+/**
+ * A DTCG group: child tokens and groups, plus the group-level reserved
+ * properties. `$type` on a group is inherited by every descendant without one,
+ * so it is a plain value rather than a nested node.
+ */
+export interface TokenTree {
+  [key: string]:
+    | TokenLeaf
+    | TokenTree
+    | string
+    | boolean
+    | Record<string, unknown>
+    | undefined;
   $type?: string;
   $description?: string;
-}
-
-export interface TokenTree {
-  [key: string]: TokenLeaf | TokenTree;
+  $extensions?: Record<string, unknown>;
+  $deprecated?: boolean | string;
 }
 
 /**
@@ -70,7 +91,7 @@ export function getHierarchy(data: { hierarchy: Hierarchy }): Hierarchy {
 
   if (!ALLOWED_HIERARCHIES.includes(normalizedHierarchy)) {
     throw new Error(
-      `Invalid hierarchy '${rawHierarchy}'. Allowed: ${ALLOWED_HIERARCHIES.join(", ")}`
+      `Invalid hierarchy '${rawHierarchy}'. Allowed: ${ALLOWED_HIERARCHIES.join(", ")}`,
     );
   }
   return normalizedHierarchy;
@@ -79,7 +100,10 @@ export function getHierarchy(data: { hierarchy: Hierarchy }): Hierarchy {
 /**
  * Returns the single `tokens/{hierarchy}/tokens.json` file path.
  */
-export function getTokenFilePath(hierarchy: Hierarchy, tokensRoot: string = TOKENS_DIR): string {
+export function getTokenFilePath(
+  hierarchy: Hierarchy,
+  tokensRoot: string = TOKENS_DIR,
+): string {
   const dir = join(tokensRoot, hierarchy);
   if (!existsSync(dir)) {
     mkdirSync(dir, { recursive: true });
@@ -108,12 +132,17 @@ export function parseTokenValue(value: string): TokenLeaf {
   }
 }
 
-export function getNested(tree: TokenTree, tokenPath: string): TokenLeaf | TokenTree | undefined {
+export function getNested(
+  tree: TokenTree,
+  tokenPath: string,
+): TokenLeaf | TokenTree | undefined {
   const parts = tokenPath.split(".");
   let current: TokenLeaf | TokenTree | undefined = tree;
   for (const p of parts) {
     if (current && typeof current === "object" && p in current) {
-      current = (current as TokenTree)[p];
+      // A path segment is never a DTCG metadata key: `$type` is not kebab-case,
+      // so assertValidPath rejects it long before we walk it.
+      current = (current as TokenTree)[p] as TokenLeaf | TokenTree | undefined;
     } else {
       return undefined;
     }
@@ -121,7 +150,11 @@ export function getNested(tree: TokenTree, tokenPath: string): TokenLeaf | Token
   return current;
 }
 
-export function setNested(tree: TokenTree, tokenPath: string, value: TokenLeaf): void {
+export function setNested(
+  tree: TokenTree,
+  tokenPath: string,
+  value: TokenLeaf,
+): void {
   const parts = tokenPath.split(".");
   let cursor: TokenTree = tree;
   for (let i = 0; i < parts.length - 1; i++) {
@@ -156,7 +189,12 @@ export function cleanEmptyParents(tree: TokenTree, tokenPath: string): void {
   for (let i = parts.length - 1; i > 0; i--) {
     const parentPath = parts.slice(0, i).join(".");
     const parent = getNested(tree, parentPath);
-    if (parent && typeof parent === "object" && !("$value" in parent) && Object.keys(parent).length === 0) {
+    if (
+      parent &&
+      typeof parent === "object" &&
+      !("$value" in parent) &&
+      Object.keys(parent).length === 0
+    ) {
       deleteNested(tree, parentPath);
     } else {
       break;
@@ -196,13 +234,12 @@ function assertValidPath(tokenPath: string): void {
 export function assertTreeValid(
   tree: TokenTree,
   hierarchy: Hierarchy,
-  tokensRoot: string = TOKENS_DIR
+  tokensRoot: string = TOKENS_DIR,
 ): void {
   const validator = new TokenValidator();
-  const byHierarchy = new TokenLoader(tokensRoot).loadTokensByHierarchy() as Map<
-    Hierarchy,
-    TokenGroup
-  >;
+  const byHierarchy = new TokenLoader(
+    tokensRoot,
+  ).loadTokensByHierarchy() as Map<Hierarchy, TokenGroup>;
   byHierarchy.set(hierarchy, tree as TokenGroup);
   if (!validator.validate(byHierarchy)) {
     console.error("❌ Token validation failed:");
@@ -225,7 +262,9 @@ export function createToken(data: TokenData): void {
   const tree = readTokenFile(filePath);
 
   if (getNested(tree, tokenPath)) {
-    console.log(`Token already exists at path: ${tokenPath}. Use the update action instead.`);
+    console.log(
+      `Token already exists at path: ${tokenPath}. Use the update action instead.`,
+    );
     process.exit(0);
   }
 
@@ -258,9 +297,15 @@ export function updateToken(data: TokenData): void {
     process.exit(1);
   }
 
-  const leaf = parseTokenValue(data.value ?? "");
-  leaf.$type = data.tokenType ?? (existing as TokenLeaf).$type;
-  leaf.$description = data.description ?? (existing as TokenLeaf).$description;
+  // Spread the existing leaf first: an update manages $value, $type and
+  // $description, and must not drop $extensions, $deprecated or anything else
+  // the token already carries.
+  const leaf: TokenLeaf = {
+    ...(existing as TokenLeaf),
+    ...parseTokenValue(data.value ?? ""),
+  };
+  if (data.tokenType) leaf.$type = data.tokenType;
+  if (data.description) leaf.$description = data.description;
 
   setNested(tree, tokenPath, leaf);
   assertTreeValid(tree, hierarchy, tokensRoot);
@@ -324,7 +369,11 @@ function fail(message: string): never {
 }
 
 function isLeaf(node: unknown): boolean {
-  return !!node && typeof node === "object" && "$value" in (node as Record<string, unknown>);
+  return (
+    !!node &&
+    typeof node === "object" &&
+    "$value" in (node as Record<string, unknown>)
+  );
 }
 
 function isDtcgMetadataKey(key: string): boolean {
@@ -341,7 +390,7 @@ function isDtcgMetadataKey(key: string): boolean {
 function collectEntries(
   node: TokenTree,
   path: string[] = [],
-  out: Map<string, string> = new Map()
+  out: Map<string, string> = new Map(),
 ): Map<string, string> {
   if (isLeaf(node)) {
     out.set(path.join("."), JSON.stringify(node));
@@ -361,7 +410,11 @@ function collectEntries(
 }
 
 /** Every token path in a tree, ignoring DTCG metadata keys. */
-export function collectLeafPaths(node: TokenTree, path: string[] = [], out: string[] = []): string[] {
+export function collectLeafPaths(
+  node: TokenTree,
+  path: string[] = [],
+  out: string[] = [],
+): string[] {
   if (isLeaf(node)) {
     out.push(path.join("."));
     return out;
@@ -385,7 +438,10 @@ export function collectLeafPaths(node: TokenTree, path: string[] = [], out: stri
  * incoming document types the group instead of the leaf, which is exactly the
  * stale metadata an override is meant to clear.
  */
-export function mergeTokenTrees(target: TokenTree, incoming: TokenTree): TokenTree {
+export function mergeTokenTrees(
+  target: TokenTree,
+  incoming: TokenTree,
+): TokenTree {
   for (const [key, value] of Object.entries(incoming)) {
     if (isDtcgMetadataKey(key) || isLeaf(value)) {
       target[key] = value;
@@ -403,7 +459,10 @@ export function mergeTokenTrees(target: TokenTree, incoming: TokenTree): TokenTr
 }
 
 /** Renders an import summary as markdown for the PR body. */
-export function formatImportSummary(summary: ImportSummary, data: ImportData): string {
+export function formatImportSummary(
+  summary: ImportSummary,
+  data: ImportData,
+): string {
   const cap = 50;
   const section = (title: string, entries: string[]): string => {
     if (entries.length === 0) return "";
@@ -451,12 +510,14 @@ export function importTokens(data: ImportData): ImportSummary {
     parsed = JSON.parse(readFileSync(data.file, "utf8"));
   } catch (error) {
     fail(
-      `❌ Could not parse '${data.file}' as JSON: ${error instanceof Error ? error.message : String(error)}`
+      `❌ Could not parse '${data.file}' as JSON: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
 
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    fail(`❌ '${data.file}' must contain a DTCG token object at the top level.`);
+    fail(
+      `❌ '${data.file}' must contain a DTCG token object at the top level.`,
+    );
   }
   const incoming = parsed as TokenTree;
 
@@ -465,19 +526,28 @@ export function importTokens(data: ImportData): ImportSummary {
   const filePath = getTokenFilePath(hierarchy, tokensRoot);
   const before = collectEntries(readTokenFile(filePath));
 
-  const tree = mode === "replace" ? incoming : mergeTokenTrees(readTokenFile(filePath), incoming);
+  const tree =
+    mode === "replace"
+      ? incoming
+      : mergeTokenTrees(readTokenFile(filePath), incoming);
 
   const after = collectEntries(tree);
 
   const summary: ImportSummary = {
     added: [...after.keys()].filter((k) => !before.has(k)).sort(),
-    updated: [...after.keys()].filter((k) => before.has(k) && before.get(k) !== after.get(k)).sort(),
+    updated: [...after.keys()]
+      .filter((k) => before.has(k) && before.get(k) !== after.get(k))
+      .sort(),
     removed: [...before.keys()].filter((k) => !after.has(k)).sort(),
-    unchanged: [...after.keys()].filter((k) => before.get(k) === after.get(k)).sort(),
+    unchanged: [...after.keys()]
+      .filter((k) => before.get(k) === after.get(k))
+      .sort(),
     changed: false,
   };
   summary.changed =
-    summary.added.length > 0 || summary.updated.length > 0 || summary.removed.length > 0;
+    summary.added.length > 0 ||
+    summary.updated.length > 0 ||
+    summary.removed.length > 0;
 
   assertTreeValid(tree, hierarchy, tokensRoot);
   writeTokenFile(filePath, tree);
@@ -485,7 +555,7 @@ export function importTokens(data: ImportData): ImportSummary {
   console.log(
     `✅ Imported into '${hierarchy}' (${mode}): ${summary.added.length} added, ` +
       `${summary.updated.length} updated, ${summary.removed.length} removed, ` +
-      `${summary.unchanged.length} unchanged.`
+      `${summary.unchanged.length} unchanged.`,
   );
 
   return summary;

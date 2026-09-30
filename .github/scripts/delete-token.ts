@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
-import { deleteToken, type TokenData } from "./token-common.ts";
+import { deleteToken, type TokenData } from "./token-common";
 
 const argv = await yargs(hideBin(process.argv))
   .option("hierarchy", { type: "string", demandOption: true })

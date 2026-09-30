@@ -1,9 +1,17 @@
-import { cpSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import {
+  cpSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   assertTreeValid,
   deleteToken,
+  updateToken,
+  type TokenLeaf,
   type TokenTree,
 } from "../.github/scripts/token-common.js";
 import { captureExit, getFixtureDir } from "./test-helpers.js";
@@ -124,5 +132,82 @@ describe("deleteToken", () => {
     );
 
     expect(readFileSync(join(tokensRoot, "universal", "tokens.json"), "utf8")).toBe(before);
+  });
+});
+
+
+describe("updateToken", () => {
+  let workDir: string;
+  let tokensRoot: string;
+
+  beforeEach(() => {
+    workDir = mkdtempSync(join(tmpdir(), "update-token-"));
+    tokensRoot = join(workDir, "tokens");
+    cpSync(FIXTURE_ROOT, tokensRoot, { recursive: true });
+
+    // The fixture leaf carries every DTCG reserved property.
+    const file = join(tokensRoot, "design-values", "tokens.json");
+    const tree = JSON.parse(readFileSync(file, "utf8"));
+    tree.blue["500"].lightness = {
+      $value: 0.4989,
+      $type: "number",
+      $description: "Lightness channel of blue-500",
+      $extensions: { "com.example.tool": { id: "abc123" } },
+      $deprecated: "use blue.600.lightness instead",
+    };
+    writeFileSync(file, JSON.stringify(tree, null, 2));
+  });
+
+  afterEach(() => {
+    rmSync(workDir, { recursive: true, force: true });
+  });
+
+  function readLeaf(): TokenLeaf {
+    const tree = JSON.parse(
+      readFileSync(join(tokensRoot, "design-values", "tokens.json"), "utf8"),
+    );
+    return tree.blue["500"].lightness;
+  }
+
+  it("keeps $extensions and $deprecated when only the value changes", () => {
+    const { exited } = captureExit(() =>
+      updateToken({
+        action: "update",
+        hierarchy: "design-values",
+        namespace: "blue",
+        base: "500.lightness",
+        value: "0.55",
+        tokensRoot,
+      }),
+    );
+
+    expect(exited).toBe(false);
+    expect(readLeaf()).toEqual({
+      $value: 0.55,
+      $type: "number",
+      $description: "Lightness channel of blue-500",
+      $extensions: { "com.example.tool": { id: "abc123" } },
+      $deprecated: "use blue.600.lightness instead",
+    });
+  });
+
+  it("still overrides $type and $description when they are supplied", () => {
+    captureExit(() =>
+      updateToken({
+        action: "update",
+        hierarchy: "design-values",
+        namespace: "blue",
+        base: "500.lightness",
+        value: "0.55",
+        tokenType: "dimension",
+        description: "rewritten",
+        tokensRoot,
+      }),
+    );
+
+    const leaf = readLeaf();
+    expect(leaf.$type).toBe("dimension");
+    expect(leaf.$description).toBe("rewritten");
+    expect(leaf.$extensions).toEqual({ "com.example.tool": { id: "abc123" } });
   });
 });

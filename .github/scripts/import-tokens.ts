@@ -2,7 +2,7 @@
 import { writeFileSync } from "node:fs";
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
-import { formatImportSummary, importTokens, type ImportData } from "./token-common.ts";
+import { formatImportSummary, importTokens, type ImportData } from "./token-common";
 
 const argv = await yargs(hideBin(process.argv))
   .option("hierarchy", {
