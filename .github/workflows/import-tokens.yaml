@@ -43,18 +43,36 @@ jobs:
           body: ${{ inputs.issue-body }}
           issue-form-template: import-tokens.yaml
 
-      # The payload is a whole JSON document written by a stranger. It reaches the
-      # script through a file, never through a shell argument or a `${{ }}`
-      # interpolation inside a run block.
-      - name: Write import payload
-        id: payload
+      # The field holds untrusted issue text, so it reaches the parser through an
+      # env var — never a shell argument or a `${{ }}` interpolation in a run
+      # block. The parser also allow-lists the host, so this step cannot be
+      # talked into fetching an arbitrary URL.
+      - name: Resolve attachment URL
+        id: attachment
         env:
-          TOKENS_JSON: ${{ steps.parse.outputs['parsed_tokens-json'] }}
+          TOKEN_FILE_FIELD: ${{ steps.parse.outputs['parsed_token-file'] }}
         run: |
           set -euo pipefail
-          printf '%s' "$TOKENS_JSON" > "$RUNNER_TEMP/import.json"
-          echo "bytes=$(wc -c < "$RUNNER_TEMP/import.json")" >> "$GITHUB_OUTPUT"
-          echo "Wrote $(wc -c < "$RUNNER_TEMP/import.json") bytes"
+          URL=$(npx tsx .github/scripts/attachment-url.ts)
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          echo "Attachment: $URL"
+
+      # GitHub has no supported API for issue attachments; the documented-enough
+      # path is to follow the redirect to the pre-signed asset URL. No auth
+      # header is sent — the signature is already in the redirect, and adding one
+      # breaks it. 2 MB is far more than any sane token document.
+      - name: Download token file
+        env:
+          ATTACHMENT_URL: ${{ steps.attachment.outputs.url }}
+        run: |
+          set -euo pipefail
+          curl --fail --location --silent --show-error \
+            --max-filesize 2097152 \
+            --max-time 60 \
+            --user-agent "design-tokens-import-bot" \
+            --output "$RUNNER_TEMP/import.json" \
+            "$ATTACHMENT_URL"
+          echo "Downloaded $(wc -c < "$RUNNER_TEMP/import.json") bytes"
 
       - name: Create branch for changes
         id: branch

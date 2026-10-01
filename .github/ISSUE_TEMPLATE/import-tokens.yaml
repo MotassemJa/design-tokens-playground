@@ -8,7 +8,7 @@ body:
       value: |
         ## Import a DTCG Token File
 
-        Paste a **DTCG-conform** JSON document. It is written into the single
+        **Attach your `.json` file** below. It is written into the single
         `tokens/{hierarchy}/tokens.json` file for the hierarchy you pick, and the
         result is opened as a pull request.
 
@@ -71,18 +71,16 @@ body:
       required: true
 
   - type: textarea
-    id: tokens-json
+    id: token-file
     attributes:
-      label: DTCG JSON
-      description: The full document. GitHub caps an issue body at ~65,000 characters.
-      render: json
-      placeholder: |
-        {
-          "color": {
-            "$type": "color",
-            "green": { "500": { "$value": "oklch(0.72 0.19 149)" } }
-          }
-        }
+      label: Token file
+      description: |
+        **Drag your `.json` file into this box**, or click it and use the
+        attachment button in the toolbar. GitHub uploads the file and leaves a
+        link behind — that link is what gets imported, so leave it in place.
+
+        Attach exactly one `.json` file, and nothing else in this field.
+      placeholder: "Drop tokens.json here…"
     validations:
       required: true
 
@@ -100,6 +98,8 @@ body:
     attributes:
       label: Pre-submission Checklist
       options:
+        - label: I attached exactly one `.json` file above (not pasted JSON, not a path).
+          required: true
         - label: The JSON is DTCG-conform and parses.
           required: true
         - label: All path segments are lowercase `kebab-case`, with no hierarchy prefix.

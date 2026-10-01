@@ -130,6 +130,51 @@ export function exitOnError<T>(run: () => T): T {
   }
 }
 
+/**
+ * Host and path prefix GitHub serves issue attachments from. Only this prefix
+ * is accepted: the import workflow runs with `contents: write`, so it must
+ * never be talked into fetching an arbitrary URL a requester pasted.
+ */
+const ATTACHMENT_URL_PREFIX = "https://github.com/user-attachments/files/";
+
+const ATTACHMENT_URL_PATTERN =
+  /https:\/\/github\.com\/user-attachments\/files\/\d+\/[^\s)\]]+/g;
+
+/**
+ * Pulls the attachment URL out of an issue-form field.
+ *
+ * Dropping a file into a form textarea leaves a markdown link behind —
+ * `[tokens.json](https://github.com/user-attachments/files/123/tokens.json)` —
+ * so the field holds a link, not a path. A bare URL is accepted too.
+ */
+export function parseAttachmentUrl(raw: unknown): string {
+  const text = String(raw ?? "").trim();
+  if (!text) {
+    throw new Error("No file was attached. Drag a .json file into the form field.");
+  }
+
+  const matches = text.match(ATTACHMENT_URL_PATTERN) ?? [];
+
+  if (matches.length === 0) {
+    throw new Error(
+      `No GitHub attachment link found in the field. Expected a link to ` +
+        `${ATTACHMENT_URL_PREFIX}…, got: ${text.slice(0, 200)}`,
+    );
+  }
+  if (matches.length > 1) {
+    throw new Error(
+      `Found ${matches.length} attachments; attach exactly one .json file.`,
+    );
+  }
+
+  const url = matches[0] ?? "";
+  if (!url.toLowerCase().endsWith(".json") && !url.toLowerCase().endsWith(".jsonc")) {
+    throw new Error(`Attachment must be a .json file, got: ${url}`);
+  }
+
+  return url;
+}
+
 /** The modes an import can run in. */
 export const IMPORT_MODES = ["merge", "replace"] as const;
 

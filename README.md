@@ -223,8 +223,8 @@ Every request lands as a pull request, never a direct push to `main`. See
 
 ### Importing a token file
 
-The **📥 Import Token File** issue template takes a whole DTCG JSON document and
-writes it into one hierarchy:
+The **📥 Import Token File** issue template takes an attached `.json` file —
+drag it into the form's file field — and writes it into one hierarchy:
 
 - **merge** (default) overlays the document. Tokens you do not mention are kept;
   tokens you do mention are replaced outright, so a stale `$type` or
@@ -232,6 +232,10 @@ writes it into one hierarchy:
 - **replace** makes the document the whole file. Anything missing from it is
   removed, and the import is rejected if another layer still references what
   would go.
+
+GitHub uploads the file and leaves a link in the issue; the workflow downloads it
+from `github.com/user-attachments/` (only that host) and feeds it to the import
+script. Nothing is pasted and no path is typed.
 
 The document is taken as DTCG-conform and is not normalized — in particular
 `$type` may sit on a **group** and be inherited by everything below it:
@@ -252,7 +256,7 @@ Paths carry no hierarchy prefix, every segment is lowercase `kebab-case`, and a
 layer may reference only itself and layers below it. Malformed paths are all
 reported in one run.
 
-The same import can be run locally:
+The same import can be run locally against a file on disk:
 
 ```bash
 npx tsx .github/scripts/import-tokens.ts \

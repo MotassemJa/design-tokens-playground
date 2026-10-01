@@ -2,6 +2,7 @@ import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   formatImportSummary,
+  parseAttachmentUrl,
   parseDropdownValue,
   parseHierarchy,
   parseImportMode,
@@ -338,5 +339,77 @@ describe("parseImportMode", () => {
   it("rejects anything else, naming what is allowed", () => {
     expect(() => parseImportMode("overwrite")).toThrow(/Invalid mode 'overwrite'/);
     expect(() => parseImportMode("overwrite")).toThrow(/merge, replace/);
+  });
+});
+
+
+describe("parseAttachmentUrl", () => {
+  const url = "https://github.com/user-attachments/files/12345678/tokens.json";
+
+  it("reads the link that dropping a file into the form leaves behind", () => {
+    expect(parseAttachmentUrl(`[tokens.json](${url})`)).toBe(url);
+  });
+
+  it("accepts a bare url", () => {
+    expect(parseAttachmentUrl(url)).toBe(url);
+    expect(parseAttachmentUrl(`  ${url}  `)).toBe(url);
+  });
+
+  it("accepts .jsonc", () => {
+    const jsonc = "https://github.com/user-attachments/files/1/tokens.jsonc";
+    expect(parseAttachmentUrl(jsonc)).toBe(jsonc);
+  });
+
+  it("tells the user when nothing was attached", () => {
+    expect(() => parseAttachmentUrl("")).toThrow(/No file was attached/);
+    expect(() => parseAttachmentUrl(undefined)).toThrow(/No file was attached/);
+  });
+
+  it("rejects a pasted JSON document", () => {
+    expect(() => parseAttachmentUrl('{ "color": { "$value": "#fff" } }')).toThrow(
+      /No GitHub attachment link found/,
+    );
+  });
+
+  it("rejects a local path", () => {
+    expect(() => parseAttachmentUrl("./my-tokens.json")).toThrow(
+      /No GitHub attachment link found/,
+    );
+  });
+
+  it("rejects a non-json attachment", () => {
+    expect(() =>
+      parseAttachmentUrl("https://github.com/user-attachments/files/1/tokens.zip"),
+    ).toThrow(/must be a .json file/);
+  });
+
+  it("rejects more than one attachment", () => {
+    const second = "https://github.com/user-attachments/files/2/other.json";
+    expect(() => parseAttachmentUrl(`${url}\n${second}`)).toThrow(
+      /Found 2 attachments/,
+    );
+  });
+
+  // The workflow runs with contents: write, so the host allow-list matters more
+  // than any other check here.
+  it.each([
+    "https://evil.example.com/user-attachments/files/1/tokens.json",
+    "https://github.com.evil.example.com/user-attachments/files/1/tokens.json",
+    "http://github.com/user-attachments/files/1/tokens.json",
+    "https://github.com/user-attachments/assets/1/tokens.json",
+    "https://raw.githubusercontent.com/o/r/main/tokens.json",
+    "https://github.com/o/r/files/1/tokens.json",
+    "file:///etc/passwd",
+    "http://169.254.169.254/latest/meta-data/tokens.json",
+  ])("refuses to fetch %s", (hostile) => {
+    expect(() => parseAttachmentUrl(hostile)).toThrow(/No GitHub attachment link found/);
+  });
+
+  it("ignores a hostile url sitting next to the real attachment", () => {
+    // The pattern only matches the allow-listed prefix, so the decoy is not a
+    // candidate at all — it does not even count toward the "exactly one" check.
+    expect(parseAttachmentUrl(`[a](https://evil.example.com/x.json) [b](${url})`)).toBe(
+      url,
+    );
   });
 });

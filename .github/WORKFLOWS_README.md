@@ -124,9 +124,13 @@ If labels are invalid (e.g., both `create` and `update`, or missing action label
 - **Trigger**: Called by dispatcher when `import` label present
 - **Actions**:
   - Parses the import form
-  - Writes the pasted DTCG document to a file via an env var — never into a shell
-    argument or a `${{ }}` interpolation, since the payload is a whole JSON
-    document supplied by a stranger
+  - Resolves the attachment link the uploaded file left in the issue, via an env
+    var — never a shell argument or a `${{ }}` interpolation, since the field is
+    untrusted issue text. The host is allow-listed to
+    `github.com/user-attachments/files/`, so the step cannot be talked into
+    fetching an arbitrary URL
+  - Downloads the file, capped at 2 MB, with no auth header (the redirect to the
+    asset is already pre-signed)
   - Merges it onto, or replaces, `tokens/{hierarchy}/tokens.json`
   - Creates a PR whose body is the summary the script wrote
 
@@ -139,6 +143,11 @@ If labels are invalid (e.g., both `create` and `update`, or missing action label
 
 The document is taken as DTCG-conform and is not normalized: `$type` may sit on a
 group and be inherited by its descendants.
+
+GitHub has no supported API for downloading issue attachments, so the download
+follows the redirect from the `user-attachments` link. That path works for this
+public repository but is undocumented and could change; a private repository
+would need auth that is not known to work against those URLs.
 
 ## Workflow Inputs
 
@@ -182,9 +191,11 @@ All four token workflows are **reusable workflows** and receive inputs from the 
 2. **Invalid form data**: Check that all required fields in the form are filled
 3. **Token already exists** (create): The token name may already be in use
 4. **Token path not found** (update/delete): The token path may be incorrect
-5. **Malformed document** (import): The JSON did not parse, or a path segment is not
+5. **No file attached** (import): the form field must hold exactly one uploaded
+   `.json` file — pasted JSON or a typed path is rejected
+6. **Malformed document** (import): The JSON did not parse, or a path segment is not
    kebab-case — the script logs every offending path in one run
-6. **No changes** (import): every token in the document already matches the file
+7. **No changes** (import): every token in the document already matches the file
 
 **Solution**: Check the dispatcher comment on the issue for details, update the issue, and re-run.
 
@@ -224,6 +235,7 @@ All four token workflows are **reusable workflows** and receive inputs from the 
 │   ├── update-token.ts                  # CLI: update
 │   ├── delete-token.ts                  # CLI: delete
 │   ├── import-tokens.ts                 # CLI: import
+│   ├── attachment-url.ts                # CLI: resolve the uploaded file's URL
 │   └── token-common.ts                  # Shared tree, path and validation helpers
 └── WORKFLOWS_README.md                  # This file
 ```

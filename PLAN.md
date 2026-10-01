@@ -117,7 +117,7 @@ Each fix lands as its own commit, bisectable independently of import.
 
 | Decision | Choice | Why |
 | --- | --- | --- |
-| Input channel | Textarea in the issue form, JSON pasted inline | `issue-ops/parser` already handles textareas; no fetch, no auth, no attachment-type restrictions. GitHub issue bodies cap at 65,536 chars — enough for this repo's token set. Add a URL field only when a real file exceeds it. |
+| Input channel | **An uploaded `.json` file**, dropped into a form textarea | *Revised after the first implementation: the original choice was to paste JSON inline, justified by "no attachment-type restrictions" — which was wrong. GitHub allows `.json` attachments up to 25 MB, so there is no reason to make a requester paste a document or sidestep the ~65,000-character issue-body cap.* Forms have no upload field type, so the file is dropped into a textarea; GitHub uploads it and leaves a link, which the workflow resolves and downloads. |
 | Scope per import | **One hierarchy**, chosen from a dropdown | Matches the repo's strict `tokens/{hierarchy}/tokens.json` layout and `assertLayoutStrict`. Multi-layer files: see §8. |
 | Merge semantics | Dropdown: `merge` (default) / `replace` | `merge` = deep overlay, incoming leaf wins, untouched tokens preserved. `replace` = incoming document becomes the whole file. Two behaviours people actually mean by "import"; no third mode. |
 | Merge implementation | Leaf-wise deep merge (recursion stops at `$value`) + a separate walk for the change list | Correct when `$type` lives on a group, and clears stale leaf metadata on override. See §4.2 step 3. |
@@ -275,7 +275,9 @@ real issue on a branch.
 
 | Risk | Mitigation |
 | --- | --- |
-| Issue body 65 KB cap | Fail with a clear message naming the cap; add a URL-fetch field if it ever bites |
+| ~~Issue body 65 KB cap~~ | No longer applies — the document is an attachment, not body text (25 MB GitHub cap, and the download is capped at 2 MB) |
+| GitHub has no supported API for issue attachments | The download follows the redirect from the `user-attachments` link, which works for this public repo but is undocumented. A private repo would need auth not known to work there. Needs one real run to confirm end to end |
+| A requester pastes a hostile URL into the file field | The host is allow-listed to `github.com/user-attachments/files/` in `parseAttachmentUrl`, covered by tests including SSRF-shaped decoys; `curl` adds a 2 MB and 60 s cap and sends no auth header |
 | `replace` silently drops tokens other layers reference | Whole-map validation (§2.1) turns this into a hard error; the build-tokens PR comment lists removals |
 | The copied workflow inherits an existing PR-creation failure | Issue #20's dispatcher run committed to `token-request/20-color-secondary` but no PR exists and the run ended in failure; CI logs have expired (HTTP 410) so the cause is unconfirmed. Re-run a create request and fix the shared step **before** copying it into `import-tokens.yaml`. |
 | A malformed import wipes a hierarchy file | Validation runs *before* `writeTokenFile`; every change lands as a PR against `main`, never a direct push |
@@ -287,7 +289,8 @@ real issue on a branch.
 - **Multi-hierarchy files** (one document containing all five layers). Cheap to add later:
   a `multi-layer` dropdown option that splits on top-level keys matching `ALLOWED_HIERARCHIES`
   and loops the merge per layer. Add when a real export needs it, not before.
-- Fetching the file from a URL / gist / release asset.
+- Fetching the file from an arbitrary URL / gist / release asset. Only GitHub's own
+  issue-attachment host is accepted.
 - Format conversion (Tokens Studio, Figma Variables) — this imports DTCG only.
 - Dry-run / preview-only mode — the PR *is* the preview.
 - Deleting tokens by omission in `merge` mode — that is what `replace` is for.
