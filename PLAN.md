@@ -192,8 +192,13 @@ existing "Handle no changes" step then comments on the issue.
 
 ### 4.3 `.github/scripts/import-tokens.ts` (new)
 
-yargs wrapper matching the existing three: `--hierarchy`, `--mode`, `--file`, `--summary`.
-Takes a **file path**, never the JSON itself, so the payload never crosses a shell argument.
+yargs wrapper matching the existing three: `--hierarchy`, `--mode`, `--json`, `--summary`.
+
+Takes the **document itself**, not a path — there is no temp file and nothing to
+download. Passing it as one argument is safe because the workflow hands it over as
+a quoted expansion of an env var; the risk was only ever `${{ }}` interpolating
+untrusted text into the script body. Argument limits are irrelevant at this scale:
+`ARG_MAX` on the runner is megabytes, against a 65,536-character issue cap.
 
 ### 4.4 `.github/workflows/import-tokens.yaml` (new)
 
@@ -201,13 +206,14 @@ Copy of `create-token.yaml`, with these deliberate differences:
 
 - **Payload via env, not `${{ }}` interpolation.** The existing workflows splice issue
   content straight into `run:` blocks. A multi-line JSON blob containing quotes and
-  backticks breaks that script, and it is a command-injection surface. So:
+  backticks breaks that script, and it is a command-injection surface. The document
+  goes to the script as one argument, quoted from an env var — no temp file:
 
   ```yaml
-  - name: Write import payload
+  - name: Run import token script
     env:
       TOKENS_JSON: ${{ steps.parse.outputs['parsed_tokens-json'] }}
-    run: printf '%s' "$TOKENS_JSON" > "$RUNNER_TEMP/import.json"
+    run: npx tsx .github/scripts/import-tokens.ts --json "$TOKENS_JSON" …
   ```
 
 - **PR body from the summary file, not from `parsed json`.** `create-token.yaml` does
@@ -289,7 +295,7 @@ only existing test that changes.
 2. Teach the validator group-level `$type` + tests (§2.2), including the one-line update to `tests/token-validator.test.ts:76` (§5) — standalone commit. Both
    fixes stand on their own merit; import is blocked on neither individually but on both together.
 3. `importTokens()` + `import-tokens.ts` + tests — runnable locally, no CI needed:
-   `npx tsx .github/scripts/import-tokens.ts --hierarchy semantic --mode merge --file x.json`
+   `npx tsx .github/scripts/import-tokens.ts --hierarchy semantic --mode merge --json "$(cat x.json)"`
 4. Issue template + workflow + dispatcher branch — re-run the §5 matrix after touching the dispatcher.
 5. Docs.
 

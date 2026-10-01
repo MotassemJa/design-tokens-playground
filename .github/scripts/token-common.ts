@@ -384,8 +384,8 @@ export function deleteToken(data: TokenData): void {
 export interface ImportData {
   hierarchy: Hierarchy;
   mode: ImportMode;
-  /** Path to the DTCG JSON document to import. */
-  file: string;
+  /** The DTCG JSON document itself, as text. */
+  json: string;
 }
 
 export interface ImportSummary {
@@ -522,25 +522,23 @@ export function formatImportSummary(
 export function importTokens(data: ImportData): ImportSummary {
   const hierarchy = data.hierarchy;
 
-  if (!existsSync(data.file)) {
-    fail(`❌ Import file not found: ${data.file}`);
+  if (data.json.trim().length === 0) {
+    fail("❌ The DTCG JSON was empty.");
   }
 
   let parsed: unknown;
   try {
-    parsed = JSON.parse(readFileSync(data.file, "utf8"));
+    parsed = JSON.parse(data.json);
   } catch (error) {
     fail(
-      `❌ Could not parse '${data.file}' as JSON: ${error instanceof Error ? error.message : String(error)}`,
+      `❌ Could not parse the DTCG JSON: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
 
   const isTokenObject =
     !!parsed && typeof parsed === "object" && !Array.isArray(parsed);
   if (!isTokenObject) {
-    fail(
-      `❌ '${data.file}' must contain a DTCG token object at the top level.`,
-    );
+    fail("❌ The DTCG JSON must contain a token object at the top level.");
   }
   const incoming = parsed as TokenTree;
 

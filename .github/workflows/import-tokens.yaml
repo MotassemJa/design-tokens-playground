@@ -43,25 +43,6 @@ jobs:
           body: ${{ inputs.issue-body }}
           issue-form-template: import-tokens.yaml
 
-      # The payload is a whole JSON document written by a stranger. It reaches
-      # the script through a file, never through a shell argument or a `${{ }}`
-      # interpolation inside a run block: a token document contains quotes and
-      # backticks and would break the script, or worse.
-      - name: Write import payload
-        id: payload
-        env:
-          TOKENS_JSON: ${{ steps.parse.outputs['parsed_tokens-json'] }}
-        run: |
-          set -euo pipefail
-          printf '%s' "$TOKENS_JSON" > "$RUNNER_TEMP/import.json"
-          BYTES=$(wc -c < "$RUNNER_TEMP/import.json")
-          echo "bytes=$BYTES" >> "$GITHUB_OUTPUT"
-          echo "Wrote $BYTES bytes"
-          if [ "$BYTES" -eq 0 ]; then
-            echo "::error::The DTCG JSON field was empty."
-            exit 1
-          fi
-
       - name: Create branch for changes
         id: branch
         env:
@@ -81,16 +62,21 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git checkout -b "$BRANCH_NAME"
 
+      # The JSON goes straight from the form to the script as one argument.
+      # Every value is a quoted expansion of an env var — the untrusted text is
+      # never interpolated into the script body by `${{ }}`, which is what would
+      # let a document full of quotes and backticks break out.
       - name: Run import token script
         env:
           HIERARCHY: ${{ steps.parse.outputs.parsed_hierarchy }}
           MODE: ${{ steps.parse.outputs.parsed_mode }}
+          TOKENS_JSON: ${{ steps.parse.outputs['parsed_tokens-json'] }}
         run: |
           set -euo pipefail
           npx tsx .github/scripts/import-tokens.ts \
             --hierarchy "$HIERARCHY" \
             --mode "$MODE" \
-            --file "$RUNNER_TEMP/import.json" \
+            --json "$TOKENS_JSON" \
             --summary "$RUNNER_TEMP/import-summary.md"
 
       - name: Commit and push changes

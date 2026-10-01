@@ -41,9 +41,8 @@ graph TD
     F --> F3["Create Pull Request"]
     
     I --> I1["Parse issue form"]
-    I --> I2["Write pasted JSON to a file"]
-    I --> I3["Merge or replace hierarchy file"]
-    I --> I4["Create Pull Request"]
+    I --> I2["Merge or replace hierarchy file"]
+    I --> I3["Create Pull Request"]
     
     G --> G1["Comment with error"]
     H --> H1["Exit silently"]
@@ -125,9 +124,10 @@ If labels are invalid (e.g., both `create` and `update`, or missing action label
 - **Trigger**: Called by dispatcher when `import` label present
 - **Actions**:
   - Parses the import form
-  - Writes the pasted DTCG document to a file via an env var — never into a shell
-    argument or a `${{ }}` interpolation, since the payload is a whole JSON
-    document supplied by a stranger
+  - Passes the pasted document straight to the script as a `--json` argument. No
+    temp file, no download. Every value is a quoted expansion of an env var, so the
+    untrusted text is never interpolated into the script body by `${{ }}` — which
+    is what would let a document full of quotes and backticks break out
   - Merges it onto, or replaces, `tokens/{hierarchy}/tokens.json`
   - Creates a PR whose body is the summary the script wrote
 

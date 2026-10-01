@@ -258,13 +258,13 @@ Paths carry no hierarchy prefix, every segment is lowercase `kebab-case`, and a
 layer may reference only itself and layers below it. Malformed paths are all
 reported in one run.
 
-The same import can be run locally against a file on disk:
+The same import can be run locally — the script takes the JSON itself, so pipe a
+file in if you have one:
 
 ```bash
 npx tsx .github/scripts/import-tokens.ts \
   --hierarchy universal \
   --mode merge \
-  --file ./my-tokens.json \
-  --summary /tmp/summary.md
+  --json "$(cat ./my-tokens.json)"
 ```
 

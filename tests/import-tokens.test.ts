@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import {
   formatImportSummary,
@@ -26,13 +26,12 @@ interface ImportOptions {
 }
 
 function runImport(document: unknown, options: ImportOptions = {}): ScriptResult {
-  const file = join(workspace, "import.json");
-  writeFileSync(file, typeof document === "string" ? document : JSON.stringify(document));
+  const json = typeof document === "string" ? document : JSON.stringify(document);
 
   const args = [
     "--hierarchy", options.hierarchy ?? "universal",
     "--mode", options.mode ?? "merge",
-    "--file", file,
+    "--json", json,
   ];
   if (options.summary) args.push("--summary", join(workspace, "summary.md"));
 
@@ -225,18 +224,26 @@ describe("import-tokens — validation", () => {
     const result = runImport([1, 2, 3]);
 
     expect(result.status).not.toBe(0);
-    expect(result.output).toContain("must contain a DTCG token object");
+    expect(result.output).toContain("must contain a token object");
   });
 
-  it("rejects a file that does not exist", () => {
-    const result = runScript(
-      "import-tokens.ts",
-      ["--hierarchy", "universal", "--file", join(workspace, "absent.json")],
-      workspace,
-    );
+  it("rejects an empty document", () => {
+    const result = runImport("   ");
 
     expect(result.status).not.toBe(0);
-    expect(result.output).toContain("Import file not found");
+    expect(result.output).toContain("The DTCG JSON was empty");
+  });
+
+  it("carries a document full of quotes and backticks through intact", () => {
+    const hostile = "it's got `backticks`, \"quotes\" and $(echo pwned)";
+    const result = runImport(
+      { color: { teal: { 500: { $value: "#14B8A6", $type: "color", $description: hostile } } } },
+    );
+
+    expect(result.status).toBe(0);
+    expect(
+      (readHierarchy("universal") as any).color.teal["500"].$description,
+    ).toBe(hostile);
   });
 });
 
@@ -280,7 +287,7 @@ describe("formatImportSummary", () => {
     const added = Array.from({ length: 53 }, (_, i) => `color.shade.${i}`);
     const markdown = formatImportSummary(
       { added, updated: [], removed: [], unchanged: [], changed: true },
-      { hierarchy: "universal", mode: "merge", file: "x.json" },
+      { hierarchy: "universal", mode: "merge", json: "{}" },
     );
 
     expect(markdown).toContain("### Added (53)");

@@ -22,9 +22,9 @@ const argv = await yargs(hideBin(process.argv))
     default: "merge",
     description: "merge: overlay onto the existing file. replace: the file becomes this document.",
   })
-  .option("file", {
+  .option("json", {
     type: "string",
-    description: "Path to the DTCG JSON document to import",
+    description: "The DTCG JSON document itself",
     demandOption: true,
   })
   .option("summary", {
@@ -37,7 +37,7 @@ const argv = await yargs(hideBin(process.argv))
 const data: ImportData = {
   hierarchy: exitOnError(() => parseHierarchy(argv.hierarchy)),
   mode: exitOnError(() => parseImportMode(argv.mode)),
-  file: argv.file,
+  json: argv.json,
 };
 
 const summary = importTokens(data);
