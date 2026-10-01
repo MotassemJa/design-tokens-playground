@@ -8,7 +8,7 @@ body:
       value: |
         ## Import a DTCG Token File
 
-        **Attach your `.json` file** below. It is written into the single
+        **Paste your DTCG JSON** below. It is written into the single
         `tokens/{hierarchy}/tokens.json` file for the hierarchy you pick, and the
         result is opened as a pull request.
 
@@ -71,16 +71,35 @@ body:
       required: true
 
   - type: textarea
-    id: token-file
+    id: tokens-json
     attributes:
-      label: Token file
+      label: DTCG JSON
       description: |
-        **Drag your `.json` file into this box**, or click it and use the
-        attachment button in the toolbar. GitHub uploads the file and leaves a
-        link behind — that link is what gets imported, so leave it in place.
+        The full document, pasted as-is.
 
-        Attach exactly one `.json` file, and nothing else in this field.
-      placeholder: "Drop tokens.json here…"
+        **Size limit.** GitHub caps an entire issue body at 65,536 characters and
+        rejects anything longer *on submit* — the issue is not created and what
+        you typed is lost, so check before you paste something large. After this
+        form's other fields, about **64,700 characters** are left for the JSON.
+        In practice that is roughly:
+
+        | How the tokens are written                          | Max tokens |
+        | --------------------------------------------------- | ---------- |
+        | group `$type`, short names, no `$description`        | ~1,380     |
+        | leaf `$type`, nested paths, no `$description`        | ~580       |
+        | leaf `$type` + `$description` + a `{reference}`      | ~355       |
+        | long paths, long descriptions, `$extensions`         | ~150       |
+
+        Minifying (no indentation) roughly doubles each figure. For scale, this
+        repository's whole token set is 87 tokens.
+      render: json
+      placeholder: |
+        {
+          "color": {
+            "$type": "color",
+            "green": { "500": { "$value": "oklch(0.72 0.19 149)" } }
+          }
+        }
     validations:
       required: true
 
@@ -98,8 +117,6 @@ body:
     attributes:
       label: Pre-submission Checklist
       options:
-        - label: I attached exactly one `.json` file above (not pasted JSON, not a path).
-          required: true
         - label: The JSON is DTCG-conform and parses.
           required: true
         - label: All path segments are lowercase `kebab-case`, with no hierarchy prefix.

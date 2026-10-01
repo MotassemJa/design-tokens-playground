@@ -73,6 +73,11 @@ function fail(message: string): never {
   process.exit(1);
 }
 
+/** {@link fail} for a headline plus one indented line per problem. */
+function failWithList(headline: string, problems: string[]): never {
+  return fail([headline, ...problems.map((p) => `  - ${p}`)].join("\n"));
+}
+
 /**
  * Reads a single value out of an issue-form dropdown.
  *
@@ -128,51 +133,6 @@ export function exitOnError<T>(run: () => T): T {
   } catch (error) {
     return fail(`❌ ${error instanceof Error ? error.message : String(error)}`);
   }
-}
-
-/**
- * Host and path prefix GitHub serves issue attachments from. Only this prefix
- * is accepted: the import workflow runs with `contents: write`, so it must
- * never be talked into fetching an arbitrary URL a requester pasted.
- */
-const ATTACHMENT_URL_PREFIX = "https://github.com/user-attachments/files/";
-
-const ATTACHMENT_URL_PATTERN =
-  /https:\/\/github\.com\/user-attachments\/files\/\d+\/[^\s)\]]+/g;
-
-/**
- * Pulls the attachment URL out of an issue-form field.
- *
- * Dropping a file into a form textarea leaves a markdown link behind —
- * `[tokens.json](https://github.com/user-attachments/files/123/tokens.json)` —
- * so the field holds a link, not a path. A bare URL is accepted too.
- */
-export function parseAttachmentUrl(raw: unknown): string {
-  const text = String(raw ?? "").trim();
-  if (!text) {
-    throw new Error("No file was attached. Drag a .json file into the form field.");
-  }
-
-  const matches = text.match(ATTACHMENT_URL_PATTERN) ?? [];
-
-  if (matches.length === 0) {
-    throw new Error(
-      `No GitHub attachment link found in the field. Expected a link to ` +
-        `${ATTACHMENT_URL_PREFIX}…, got: ${text.slice(0, 200)}`,
-    );
-  }
-  if (matches.length > 1) {
-    throw new Error(
-      `Found ${matches.length} attachments; attach exactly one .json file.`,
-    );
-  }
-
-  const url = matches[0] ?? "";
-  if (!url.toLowerCase().endsWith(".json") && !url.toLowerCase().endsWith(".jsonc")) {
-    throw new Error(`Attachment must be a .json file, got: ${url}`);
-  }
-
-  return url;
 }
 
 /** The modes an import can run in. */
@@ -301,9 +261,7 @@ export function cleanEmptyParents(tree: TokenTree, tokenPath: string): void {
 export function assertValidPaths(tokenPaths: string[]): void {
   const errors = tokenPaths.flatMap((p) => TokenValidator.validatePath(p));
   if (errors.length > 0) {
-    console.error("❌ Invalid token path (Curtis Nathan naming convention):");
-    errors.forEach((e) => console.error(`  - ${e}`));
-    process.exit(1);
+    failWithList("❌ Invalid token path (Curtis Nathan naming convention):", errors);
   }
 }
 
@@ -327,9 +285,7 @@ export function assertTreeValid(tree: TokenTree, hierarchy: Hierarchy): void {
   >;
   byHierarchy.set(hierarchy, tree as TokenGroup);
   if (!validator.validate(byHierarchy)) {
-    console.error("❌ Token validation failed:");
-    validator.getErrors().forEach((e) => console.error(`  - ${e}`));
-    process.exit(1);
+    failWithList("❌ Token validation failed:", validator.getErrors());
   }
   validator.getWarnings().forEach((w) => console.warn(`⚠️  ${w}`));
 }
@@ -353,6 +309,7 @@ export function createToken(data: TokenData): void {
   }
 
   const leaf = parseTokenValue(data.value ?? "");
+  console.log(JSON.stringify(leaf, null, 2));
   if (data.tokenType) leaf.$type = data.tokenType;
   if (data.description) leaf.$description = data.description;
 
@@ -376,8 +333,7 @@ export function updateToken(data: TokenData): void {
 
   const existing = getNested(tree, tokenPath);
   if (!existing || typeof existing !== "object" || !("$value" in existing)) {
-    console.error(`Token not found at path: ${tokenPath}`);
-    process.exit(1);
+    fail(`❌ Token not found at path: ${tokenPath}`);
   }
 
   // Spread the existing leaf first: an update manages $value, $type and
@@ -409,8 +365,7 @@ export function deleteToken(data: TokenData): void {
   const tree = readTokenFile(filePath);
 
   if (!getNested(tree, tokenPath)) {
-    console.error(`Token not found at path: ${tokenPath}`);
-    process.exit(1);
+    fail(`❌ Token not found at path: ${tokenPath}`);
   }
 
   deleteNested(tree, tokenPath);
@@ -580,7 +535,9 @@ export function importTokens(data: ImportData): ImportSummary {
     );
   }
 
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+  const isTokenObject =
+    !!parsed && typeof parsed === "object" && !Array.isArray(parsed);
+  if (!isTokenObject) {
     fail(
       `❌ '${data.file}' must contain a DTCG token object at the top level.`,
     );

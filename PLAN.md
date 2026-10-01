@@ -117,11 +117,36 @@ Each fix lands as its own commit, bisectable independently of import.
 
 | Decision | Choice | Why |
 | --- | --- | --- |
-| Input channel | **An uploaded `.json` file**, dropped into a form textarea | *Revised after the first implementation: the original choice was to paste JSON inline, justified by "no attachment-type restrictions" — which was wrong. GitHub allows `.json` attachments up to 25 MB, so there is no reason to make a requester paste a document or sidestep the ~65,000-character issue-body cap.* Forms have no upload field type, so the file is dropped into a textarea; GitHub uploads it and leaves a link, which the workflow resolves and downloads. |
+| Input channel | **JSON pasted into a form textarea** | Decided twice. An uploaded `.json` file was built and then removed: GitHub has no upload field type, so it relies on dropping a file into a textarea and then fetching `github.com/user-attachments/files/…` — a host with no supported download API, needing a URL allow-list, a size cap and a redirect dance, and behaving differently on private repos. That is a lot of moving parts in exchange for a larger ceiling. Pasting keeps the whole path inside what the issue form already does. The measured ceiling is in §3.1. |
 | Scope per import | **One hierarchy**, chosen from a dropdown | Matches the repo's strict `tokens/{hierarchy}/tokens.json` layout and `assertLayoutStrict`. Multi-layer files: see §8. |
 | Merge semantics | Dropdown: `merge` (default) / `replace` | `merge` = deep overlay, incoming leaf wins, untouched tokens preserved. `replace` = incoming document becomes the whole file. Two behaviours people actually mean by "import"; no third mode. |
 | Merge implementation | Leaf-wise deep merge (recursion stops at `$value`) + a separate walk for the change list | Correct when `$type` lives on a group, and clears stale leaf metadata on override. See §4.2 step 3. |
 | Workflow shape | Copy `create-token.yaml` → `import-tokens.yaml` | The repo already has 3 near-identical action workflows. Factoring 4 into one composite is a bigger diff than the feature itself. **Deliberate duplication** — revisit if a 5th action appears. |
+
+### 3.1 The paste ceiling, measured
+
+GitHub caps an issue body at 65,536 characters — a MySQL `mediumblob`, 262,144
+bytes over 4-byte Unicode characters. That is the **whole body**, not the field:
+this form's other fields (hierarchy, mode, description, checklist, headers and
+the ```` ```json ```` fence) cost 754 characters, leaving **~64,780** for the JSON.
+
+Measured by generating 500-token documents in each shape:
+
+| DTCG shape | Chars/token | Max tokens | Minified |
+| --- | --- | --- | --- |
+| Lean: group `$type`, short names, no `$description` | 47 | ~1,380 | ~2,330 |
+| Leaf `$type`, nested paths, no `$description` | 112 | ~580 | ~940 |
+| This repo's style: leaf `$type` + `$description` + `{ref}` | 182 | ~355 | ~510 |
+| Heavy: long paths, long descriptions, `$extensions` | 432 | ~150 | ~240 |
+
+For scale, the repository's entire token set is 87 tokens / 16,674 characters.
+
+**The cap is enforced on submit, by GitHub.** An over-long body is rejected with
+`422 body is too long`, the issue is never created, and the requester loses what
+they typed. No workflow runs, so nothing can comment a friendlier message — which
+is why the limit is spelled out in the form itself rather than handled in code.
+Editing an existing issue re-checks it, so a requester near the limit can also get
+stuck unable to save a description tweak.
 
 ## 4. Implementation
 
@@ -275,9 +300,7 @@ real issue on a branch.
 
 | Risk | Mitigation |
 | --- | --- |
-| ~~Issue body 65 KB cap~~ | No longer applies — the document is an attachment, not body text (25 MB GitHub cap, and the download is capped at 2 MB) |
-| GitHub has no supported API for issue attachments | The download follows the redirect from the `user-attachments` link, which works for this public repo but is undocumented. A private repo would need auth not known to work there. Needs one real run to confirm end to end |
-| A requester pastes a hostile URL into the file field | The host is allow-listed to `github.com/user-attachments/files/` in `parseAttachmentUrl`, covered by tests including SSRF-shaped decoys; `curl` adds a 2 MB and 60 s cap and sends no auth header |
+| Issue body 65,536-char cap | Measured and documented in the form itself (§3.1). Not enforceable in code: GitHub rejects the issue before any workflow runs. A token set outgrowing ~355 tokens per import needs splitting across issues, or the attachment route revisited |
 | `replace` silently drops tokens other layers reference | Whole-map validation (§2.1) turns this into a hard error; the build-tokens PR comment lists removals |
 | The copied workflow inherits an existing PR-creation failure | Issue #20's dispatcher run committed to `token-request/20-color-secondary` but no PR exists and the run ended in failure; CI logs have expired (HTTP 410) so the cause is unconfirmed. Re-run a create request and fix the shared step **before** copying it into `import-tokens.yaml`. |
 | A malformed import wipes a hierarchy file | Validation runs *before* `writeTokenFile`; every change lands as a PR against `main`, never a direct push |
@@ -289,8 +312,9 @@ real issue on a branch.
 - **Multi-hierarchy files** (one document containing all five layers). Cheap to add later:
   a `multi-layer` dropdown option that splits on top-level keys matching `ALLOWED_HIERARCHIES`
   and loops the merge per layer. Add when a real export needs it, not before.
-- Fetching the file from an arbitrary URL / gist / release asset. Only GitHub's own
-  issue-attachment host is accepted.
+- Fetching the document from anywhere — a URL, gist, release asset or issue
+  attachment. Built once as an attachment fetch and removed as not worth the
+  moving parts; see the input-channel row in §3.
 - Format conversion (Tokens Studio, Figma Variables) — this imports DTCG only.
 - Dry-run / preview-only mode — the PR *is* the preview.
 - Deleting tokens by omission in `merge` mode — that is what `replace` is for.

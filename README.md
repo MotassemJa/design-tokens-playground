@@ -223,8 +223,8 @@ Every request lands as a pull request, never a direct push to `main`. See
 
 ### Importing a token file
 
-The **📥 Import Token File** issue template takes an attached `.json` file —
-drag it into the form's file field — and writes it into one hierarchy:
+The **📥 Import Token File** issue template takes a DTCG JSON document, pasted
+into the form, and writes it into one hierarchy:
 
 - **merge** (default) overlays the document. Tokens you do not mention are kept;
   tokens you do mention are replaced outright, so a stale `$type` or
@@ -233,9 +233,11 @@ drag it into the form's file field — and writes it into one hierarchy:
   removed, and the import is rejected if another layer still references what
   would go.
 
-GitHub uploads the file and leaves a link in the issue; the workflow downloads it
-from `github.com/user-attachments/` (only that host) and feeds it to the import
-script. Nothing is pasted and no path is typed.
+GitHub caps an issue body at 65,536 characters and rejects a longer one on submit,
+which leaves about **64,700 characters** for the JSON once the form's other fields
+are counted — roughly 355 tokens written the way this repository writes them
+(leaf `$type` + `$description` + a reference), or ~1,380 lean ones with a
+group-level `$type` and no descriptions.
 
 The document is taken as DTCG-conform and is not normalized — in particular
 `$type` may sit on a **group** and be inherited by everything below it:

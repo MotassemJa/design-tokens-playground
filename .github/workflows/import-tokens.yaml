@@ -43,36 +43,24 @@ jobs:
           body: ${{ inputs.issue-body }}
           issue-form-template: import-tokens.yaml
 
-      # The field holds untrusted issue text, so it reaches the parser through an
-      # env var — never a shell argument or a `${{ }}` interpolation in a run
-      # block. The parser also allow-lists the host, so this step cannot be
-      # talked into fetching an arbitrary URL.
-      - name: Resolve attachment URL
-        id: attachment
+      # The payload is a whole JSON document written by a stranger. It reaches
+      # the script through a file, never through a shell argument or a `${{ }}`
+      # interpolation inside a run block: a token document contains quotes and
+      # backticks and would break the script, or worse.
+      - name: Write import payload
+        id: payload
         env:
-          TOKEN_FILE_FIELD: ${{ steps.parse.outputs['parsed_token-file'] }}
+          TOKENS_JSON: ${{ steps.parse.outputs['parsed_tokens-json'] }}
         run: |
           set -euo pipefail
-          URL=$(npx tsx .github/scripts/attachment-url.ts)
-          echo "url=$URL" >> "$GITHUB_OUTPUT"
-          echo "Attachment: $URL"
-
-      # GitHub has no supported API for issue attachments; the documented-enough
-      # path is to follow the redirect to the pre-signed asset URL. No auth
-      # header is sent — the signature is already in the redirect, and adding one
-      # breaks it. 2 MB is far more than any sane token document.
-      - name: Download token file
-        env:
-          ATTACHMENT_URL: ${{ steps.attachment.outputs.url }}
-        run: |
-          set -euo pipefail
-          curl --fail --location --silent --show-error \
-            --max-filesize 2097152 \
-            --max-time 60 \
-            --user-agent "design-tokens-import-bot" \
-            --output "$RUNNER_TEMP/import.json" \
-            "$ATTACHMENT_URL"
-          echo "Downloaded $(wc -c < "$RUNNER_TEMP/import.json") bytes"
+          printf '%s' "$TOKENS_JSON" > "$RUNNER_TEMP/import.json"
+          BYTES=$(wc -c < "$RUNNER_TEMP/import.json")
+          echo "bytes=$BYTES" >> "$GITHUB_OUTPUT"
+          echo "Wrote $BYTES bytes"
+          if [ "$BYTES" -eq 0 ]; then
+            echo "::error::The DTCG JSON field was empty."
+            exit 1
+          fi
 
       - name: Create branch for changes
         id: branch
