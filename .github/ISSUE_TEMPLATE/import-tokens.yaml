@@ -1,12 +1,12 @@
-name: 📥 Import Token File
-description: Import a whole DTCG JSON document into one hierarchy, overriding or adding tokens
+name: 📥 Import Tokens
+description: Paste a whole DTCG JSON document to override or add tokens in one hierarchy
 title: "[IMPORT] "
 labels: ["token-request", "import"]
 body:
   - type: markdown
     attributes:
       value: |
-        ## Import a DTCG Token File
+        ## Import DTCG Tokens
 
         **Paste your DTCG JSON** below. It is written into the single
         `tokens/{hierarchy}/tokens.json` file for the hierarchy you pick, and the

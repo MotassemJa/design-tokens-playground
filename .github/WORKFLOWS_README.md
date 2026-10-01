@@ -41,8 +41,9 @@ graph TD
     F --> F3["Create Pull Request"]
     
     I --> I1["Parse issue form"]
-    I --> I2["Merge or replace hierarchy file"]
-    I --> I3["Create Pull Request"]
+    I --> I2["Write pasted JSON to a file"]
+    I --> I3["Merge or replace hierarchy file"]
+    I --> I4["Create Pull Request"]
     
     G --> G1["Comment with error"]
     H --> H1["Exit silently"]
@@ -66,7 +67,7 @@ graph TD
    - **🎨 Create New Token** → Labels: `token-request`, `create`
    - **✏️ Update Existing Token** → Labels: `token-request`, `update`
    - **🗑️ Delete Token** → Labels: `token-request`, `delete`
-   - **📥 Import Token File** → Labels: `token-request`, `import`
+   - **📥 Import Tokens** → Labels: `token-request`, `import`
 3. **Fill out the form** with token details
 4. **Submit** the issue
 
@@ -181,6 +182,25 @@ All four token workflows are **reusable workflows** and receive inputs from the 
 - Issue forms (`issue-ops/parser`) extract structured data
 - Templates ensure consistent token information
 - Reduces manual validation
+- **Dropdowns arrive as JSON arrays.** `parsed_hierarchy` is `["universal"]`, not
+  `universal`. `parseDropdownValue` in `token-common.ts` unwraps that (and the bare
+  `[universal]` form, and a plain string) at the CLI boundary, so every value
+  behind it is a validated `Hierarchy` or `ImportMode` rather than a loose string
+
+### ✅ Shared Validation
+Every operation — create, update, delete and import — validates the whole token
+set before writing, not just the file being touched:
+
+- **References resolve across hierarchies.** Token paths carry no hierarchy prefix,
+  so `assertTreeValid` loads every hierarchy and overlays the modified tree. Each
+  layer may reference only itself and layers below it
+- **Deletes are validated too.** Removing a token another layer still references is
+  rejected, and the file is left untouched
+- **Replaces are validated too.** An `import --mode replace` that would drop a
+  referenced token is rejected for the same reason
+- **Every malformed path is reported at once**, so one run tells you everything
+  that needs fixing
+- **`$type` may sit on a group** and is inherited by its descendants, per DTCG
 
 ## Troubleshooting
 
@@ -191,11 +211,23 @@ All four token workflows are **reusable workflows** and receive inputs from the 
 2. **Invalid form data**: Check that all required fields in the form are filled
 3. **Token already exists** (create): The token name may already be in use
 4. **Token path not found** (update/delete): The token path may be incorrect
-5. **Malformed document** (import): The JSON did not parse, or a path segment is not
+5. **Reference still points at it** (delete, or `import --mode replace`): another
+   layer references the token being removed, so the write is refused
+6. **Malformed document** (import): The JSON did not parse, or a path segment is not
    kebab-case — the script logs every offending path in one run
-6. **No changes** (import): every token in the document already matches the file
+7. **No changes**: every token in the request already matches the file
+8. **Issue was never created** (import): a body over 65,536 characters is rejected by
+   GitHub on submit, so no workflow ever ran — see [Size ceiling](#size-ceiling)
 
-**Solution**: Check the dispatcher comment on the issue for details, update the issue, and re-run.
+**Solution**: open the workflow run under the **Actions** tab and read the script
+output. Note two gaps worth knowing:
+
+- **A failing script does not comment on the issue.** The commit step is skipped, so
+  the `Handle no changes` step — which is gated on `changes == 'false'` — never
+  fires either. The run logs are the only record
+- **Only `create` and `import` comment on a no-op at all.** `update` and
+  `delete` have no `Handle no changes` step, so a request that changes nothing
+  finishes green and silent
 
 ### Multiple Action Labels
 
@@ -227,7 +259,7 @@ All four token workflows are **reusable workflows** and receive inputs from the 
 │   ├── create-token.yaml                # Form: create token issue
 │   ├── update-token.yaml                # Form: update token issue
 │   ├── delete-token.yaml                # Form: delete token issue
-│   └── import-tokens.yaml               # Form: import token file issue
+│   └── import-tokens.yaml               # Form: import a DTCG document
 ├── scripts/
 │   ├── create-token.ts                  # CLI: create
 │   ├── update-token.ts                  # CLI: update
@@ -241,10 +273,10 @@ All four token workflows are **reusable workflows** and receive inputs from the 
 
 | Metric | Before | After |
 |--------|--------|-------|
-| Pipelines per issue event | 3 parallel | 1 dispatcher + 1 selected |
+| Pipelines per issue event | one per action type, all in parallel | 1 dispatcher + 1 selected |
 | Decision time | ~30s per workflow | ~5s in router |
 | Wasted runs | High (wrong type runs) | Zero (router prevents it) |
-| API calls | Multiple × 3 | Single batch |
+| API calls | Multiple, one set per action workflow | Single batch |
 | User wait time | Longer (concurrent) | Shorter (single path) |
 
 ## Related Documentation
@@ -253,6 +285,9 @@ All four token workflows are **reusable workflows** and receive inputs from the 
 - **Token Validation**: `src/token-validator.ts` (used by build pipeline and `.github/scripts/token-common.ts`)
 - **Build Pipeline**: `.github/workflows/build-tokens.yaml`
 - **Publishing**: `.github/workflows/publish-npm.yaml`
+- **Script tests**: `tests/token-common.test.ts` and `tests/import-tokens.test.ts`
+  run the CLIs as their own processes against a fixture, which is why they are
+  slower than the rest of the suite
 
 ## CI Stages
 

@@ -223,7 +223,7 @@ Every request lands as a pull request, never a direct push to `main`. See
 
 ### Importing a token file
 
-The **📥 Import Token File** issue template takes a DTCG JSON document, pasted
+The **📥 Import Tokens** issue template takes a DTCG JSON document, pasted
 into the form, and writes it into one hierarchy:
 
 - **merge** (default) overlays the document. Tokens you do not mention are kept;
