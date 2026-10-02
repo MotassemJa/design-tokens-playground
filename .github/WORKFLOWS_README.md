@@ -143,12 +143,14 @@ group and be inherited by its descendants.
 
 #### Size ceiling
 
-GitHub caps an issue body at 65,536 characters, which leaves ~64,700 for the JSON
-after the form's other fields. Measured against real DTCG shapes that is ~1,380
-lean tokens, ~355 written the way this repository writes them, or ~150 with long
-paths, long descriptions and `$extensions`. The cap is enforced by GitHub **on
-submit**: an over-long issue is never created, so no workflow runs and no comment
-can explain it. The requester sees GitHub's own `body is too long` error.
+GitHub caps an issue body at 65,536 characters. The per-shape token ceilings are
+in the issue form itself (`.github/ISSUE_TEMPLATE/import-tokens.yaml`), which is
+where a requester reads them at the moment it matters — keep them in that one
+place.
+
+What matters here is *when* the cap bites: GitHub enforces it **on submit**, so an
+over-long issue is never created, no workflow runs, and no comment can explain it.
+The requester sees GitHub's own `body is too long` error.
 
 ## Workflow Inputs
 

@@ -233,11 +233,8 @@ into the form, and writes it into one hierarchy:
   removed, and the import is rejected if another layer still references what
   would go.
 
-GitHub caps an issue body at 65,536 characters and rejects a longer one on submit,
-which leaves about **64,700 characters** for the JSON once the form's other fields
-are counted — roughly 355 tokens written the way this repository writes them
-(leaf `$type` + `$description` + a reference), or ~1,380 lean ones with a
-group-level `$type` and no descriptions.
+GitHub caps an issue body at 65,536 characters and rejects a longer one on submit.
+The form states the resulting token ceiling for each way of writing them.
 
 The document is taken as DTCG-conform and is not normalized — in particular
 `$type` may sit on a **group** and be inherited by everything below it:

@@ -28,7 +28,7 @@ const HIERARCHY_ALLOWED_REFS: Record<Hierarchy, readonly Hierarchy[]> = {
 const REFERENCE_PATTERN = /\{([^}]+)\}/g;
 
 /** DTCG metadata keys (`$type`, `$description`, …) are never path segments. */
-function isDtcgMetadataKey(key: string): boolean {
+export function isDtcgMetadataKey(key: string): boolean {
   return key.startsWith("$");
 }
 

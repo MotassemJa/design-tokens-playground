@@ -130,16 +130,10 @@ bytes over 4-byte Unicode characters. That is the **whole body**, not the field:
 this form's other fields (hierarchy, mode, description, checklist, headers and
 the ```` ```json ```` fence) cost 754 characters, leaving **~64,780** for the JSON.
 
-Measured by generating 500-token documents in each shape:
-
-| DTCG shape | Chars/token | Max tokens | Minified |
-| --- | --- | --- | --- |
-| Lean: group `$type`, short names, no `$description` | 47 | ~1,380 | ~2,330 |
-| Leaf `$type`, nested paths, no `$description` | 112 | ~580 | ~940 |
-| This repo's style: leaf `$type` + `$description` + `{ref}` | 182 | ~355 | ~510 |
-| Heavy: long paths, long descriptions, `$extensions` | 432 | ~150 | ~240 |
-
-For scale, the repository's entire token set is 87 tokens / 16,674 characters.
+Measured by generating 500-token documents in each shape: 47 chars/token lean,
+up to 432 heavy — so ~1,380 tokens down to ~150. The per-shape table lives in
+the issue form, which is the only copy; for scale, the repository's entire token
+set is 87 tokens / 16,674 characters.
 
 **The cap is enforced on submit, by GitHub.** An over-long body is rejected with
 `422 body is too long`, the issue is never created, and the requester loses what

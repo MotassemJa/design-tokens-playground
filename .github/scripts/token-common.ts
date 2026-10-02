@@ -9,6 +9,7 @@ import {
 } from "../../src/token-loader";
 import {
   TokenValidator,
+  isDtcgMetadataKey,
   type DesignTokenValue,
   type TokenGroup,
 } from "../../src/token-validator";
@@ -265,10 +266,6 @@ export function assertValidPaths(tokenPaths: string[]): void {
   }
 }
 
-function assertValidPath(tokenPath: string): void {
-  assertValidPaths([tokenPath]);
-}
-
 /**
  * Validates the token tree after an operation. Exits on failure.
  *
@@ -295,7 +292,7 @@ export function assertTreeValid(tree: TokenTree, hierarchy: Hierarchy): void {
  */
 export function createToken(data: TokenData): void {
   const tokenPath = buildTokenPath(data);
-  assertValidPath(tokenPath);
+  assertValidPaths([tokenPath]);
 
   const hierarchy = data.hierarchy;
   const filePath = getTokenFilePath(hierarchy);
@@ -325,7 +322,7 @@ export function createToken(data: TokenData): void {
  */
 export function updateToken(data: TokenData): void {
   const tokenPath = buildTokenPath(data);
-  assertValidPath(tokenPath);
+  assertValidPaths([tokenPath]);
 
   const hierarchy = data.hierarchy;
   const filePath = getTokenFilePath(hierarchy);
@@ -358,7 +355,7 @@ export function updateToken(data: TokenData): void {
  */
 export function deleteToken(data: TokenData): void {
   const tokenPath = buildTokenPath(data);
-  assertValidPath(tokenPath);
+  assertValidPaths([tokenPath]);
 
   const hierarchy = data.hierarchy;
   const filePath = getTokenFilePath(hierarchy);
@@ -392,8 +389,7 @@ export interface ImportSummary {
   added: string[];
   updated: string[];
   removed: string[];
-  unchanged: string[];
-  changed: boolean;
+  unchanged: number;
 }
 
 function isLeaf(node: unknown): boolean {
@@ -402,10 +398,6 @@ function isLeaf(node: unknown): boolean {
     typeof node === "object" &&
     "$value" in (node as Record<string, unknown>)
   );
-}
-
-function isDtcgMetadataKey(key: string): boolean {
-  return key.startsWith("$");
 }
 
 /**
@@ -438,24 +430,10 @@ function collectEntries(
 }
 
 /** Every token path in a tree, ignoring DTCG metadata keys. */
-export function collectLeafPaths(
-  node: TokenTree,
-  path: string[] = [],
-  out: string[] = [],
-): string[] {
-  if (isLeaf(node)) {
-    out.push(path.join("."));
-    return out;
-  }
-
-  for (const [key, child] of Object.entries(node)) {
-    if (isDtcgMetadataKey(key)) continue;
-    if (child && typeof child === "object") {
-      collectLeafPaths(child as TokenTree, [...path, key], out);
-    }
-  }
-
-  return out;
+export function collectLeafPaths(node: TokenTree): string[] {
+  return [...collectEntries(node).keys()].filter(
+    (path) => !path.split(".").some(isDtcgMetadataKey),
+  );
 }
 
 /**
@@ -503,7 +481,7 @@ export function formatImportSummary(
   const header =
     `**Hierarchy**: \`${data.hierarchy}\` · **Mode**: \`${data.mode}\`\n\n` +
     `${summary.added.length} added, ${summary.updated.length} updated, ` +
-    `${summary.removed.length} removed, ${summary.unchanged.length} unchanged.\n\n`;
+    `${summary.removed.length} removed, ${summary.unchanged} unchanged.\n\n`;
 
   return (
     header +
@@ -560,15 +538,9 @@ export function importTokens(data: ImportData): ImportSummary {
       .filter((k) => before.has(k) && before.get(k) !== after.get(k))
       .sort(),
     removed: [...before.keys()].filter((k) => !after.has(k)).sort(),
-    unchanged: [...after.keys()]
-      .filter((k) => before.get(k) === after.get(k))
-      .sort(),
-    changed: false,
+    unchanged: [...after.keys()].filter((k) => before.get(k) === after.get(k))
+      .length,
   };
-  summary.changed =
-    summary.added.length > 0 ||
-    summary.updated.length > 0 ||
-    summary.removed.length > 0;
 
   assertTreeValid(tree, hierarchy);
   writeTokenFile(filePath, tree);
@@ -576,7 +548,7 @@ export function importTokens(data: ImportData): ImportSummary {
   console.log(
     `✅ Imported into '${hierarchy}' (${data.mode}): ${summary.added.length} added, ` +
       `${summary.updated.length} updated, ${summary.removed.length} removed, ` +
-      `${summary.unchanged.length} unchanged.`,
+      `${summary.unchanged} unchanged.`,
   );
 
   return summary;

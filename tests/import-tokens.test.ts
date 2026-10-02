@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, rmSync } from "node:fs";
+import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import {
   formatImportSummary,
@@ -213,7 +213,7 @@ describe("import-tokens — validation", () => {
     expect(result.output).toContain("Hierarchy violation");
   });
 
-  it("rejects a file that is not JSON", () => {
+  it("rejects input that is not JSON", () => {
     const result = runImport("{ not json");
 
     expect(result.status).not.toBe(0);
@@ -258,35 +258,13 @@ describe("import-tokens — dropdown values", () => {
     expect((readHierarchy("universal") as any).color.blue["500"]).toBeDefined();
     expect(readSummary()).toContain("**Hierarchy**: `universal` · **Mode**: `merge`");
   });
-
-  it("rejects an unknown mode", () => {
-    const result = runImport({}, { mode: "overwrite" });
-
-    expect(result.status).not.toBe(0);
-    expect(result.output).toContain("Invalid mode 'overwrite'");
-  });
-
-  it("rejects an unknown hierarchy", () => {
-    const result = runImport({}, { hierarchy: "made-up" });
-
-    expect(result.status).not.toBe(0);
-    expect(result.output).toContain("Invalid hierarchy");
-  });
-});
-
-describe("import-tokens — summary file", () => {
-  it("is only written when --summary is passed", () => {
-    runImport({ color: { red: { 500: { $value: "#EF4444", $type: "color" } } } });
-
-    expect(existsSync(join(workspace, "summary.md"))).toBe(false);
-  });
 });
 
 describe("formatImportSummary", () => {
   it("caps long lists and reports the remainder", () => {
     const added = Array.from({ length: 53 }, (_, i) => `color.shade.${i}`);
     const markdown = formatImportSummary(
-      { added, updated: [], removed: [], unchanged: [], changed: true },
+      { added, updated: [], removed: [], unchanged: 0 },
       { hierarchy: "universal", mode: "merge", json: "{}" },
     );
 

@@ -39,8 +39,6 @@ export function createTokenWorkspace(fixture = "valid"): string {
 
 export interface ScriptResult {
   status: number;
-  stdout: string;
-  stderr: string;
   /** stdout and stderr combined, for asserting on a message either may carry. */
   output: string;
 }
@@ -56,7 +54,8 @@ export function runScript(script: string, args: string[], cwd: string): ScriptRe
     encoding: "utf8",
   });
 
-  const stdout = result.stdout ?? "";
-  const stderr = result.stderr ?? "";
-  return { status: result.status ?? 1, stdout, stderr, output: stdout + stderr };
+  return {
+    status: result.status ?? 1,
+    output: (result.stdout ?? "") + (result.stderr ?? ""),
+  };
 }
