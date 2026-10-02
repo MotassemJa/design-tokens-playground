@@ -1,9 +1,7 @@
 #!/usr/bin/env node
-import { writeFileSync } from "node:fs";
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 import {
-  formatImportSummary,
   importTokens,
   exitOnError,
   parseHierarchy,
@@ -27,10 +25,6 @@ const argv = await yargs(hideBin(process.argv))
     description: "The DTCG JSON document itself",
     demandOption: true,
   })
-  .option("summary", {
-    type: "string",
-    description: "Write a markdown summary of the import to this path",
-  })
   .strict()
   .parseAsync();
 
@@ -40,8 +34,4 @@ const data: ImportData = {
   json: argv.json,
 };
 
-const summary = importTokens(data);
-
-if (argv.summary) {
-  writeFileSync(argv.summary, formatImportSummary(summary, data) + "\n");
-}
+importTokens(data);

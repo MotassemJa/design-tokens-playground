@@ -76,8 +76,7 @@ jobs:
           npx tsx .github/scripts/import-tokens.ts \
             --hierarchy "$HIERARCHY" \
             --mode "$MODE" \
-            --json "$TOKENS_JSON" \
-            --summary "$RUNNER_TEMP/import-summary.md"
+            --json "$TOKENS_JSON"
 
       - name: Commit and push changes
         id: commit
@@ -105,6 +104,8 @@ jobs:
         if: steps.commit.outputs.changes == 'true'
         uses: actions/github-script@v7
         env:
+          HIERARCHY: ${{ steps.parse.outputs.parsed_hierarchy }}
+          MODE: ${{ steps.parse.outputs.parsed_mode }}
           DESCRIPTION: ${{ steps.parse.outputs.parsed_description }}
           ISSUE_TITLE: ${{ inputs.issue-title }}
           BRANCH_NAME: ${{ steps.branch.outputs.branch_name }}
@@ -112,15 +113,62 @@ jobs:
           github-token: ${{ secrets.ACTIONS_PAT || github.token }}
           script: |
             const fs = require('fs');
+            const { execFileSync } = require('child_process');
             const issueNumber = ${{ inputs.issue-number }};
 
-            // Read the summary the script wrote rather than re-parsing the issue:
-            // a token document embedded in a template literal would break on the
-            // first quote it contains.
-            const summaryPath = `${process.env.RUNNER_TEMP}/import-summary.md`;
-            const summary = fs.existsSync(summaryPath)
-              ? fs.readFileSync(summaryPath, 'utf8')
-              : '_No summary produced._';
+            // Summarise the commit we just pushed by diffing the token file
+            // against its parent. Same flatten-and-compare shape as the
+            // "Token Build Preview" comment in build-tokens.yaml.
+            const hierarchy = process.env.HIERARCHY.replace(/[^a-z-]/g, '');
+            const tokenFile = `tokens/${hierarchy}/tokens.json`;
+
+            const entries = (node, prefix = '') => {
+              const out = {};
+              if (node && typeof node === 'object' && '$value' in node) {
+                out[prefix] = JSON.stringify(node);
+                return out;
+              }
+              for (const [key, child] of Object.entries(node ?? {})) {
+                const path = prefix ? `${prefix}.${key}` : key;
+                if (key.startsWith('$')) out[path] = JSON.stringify(child);
+                else if (child && typeof child === 'object') Object.assign(out, entries(child, path));
+              }
+              return out;
+            };
+
+            let before = {};
+            try {
+              before = entries(JSON.parse(
+                execFileSync('git', ['show', `HEAD~1:${tokenFile}`], {
+                  encoding: 'utf8',
+                  stdio: ['ignore', 'pipe', 'ignore'],
+                })
+              ));
+            } catch {
+              // The hierarchy file is new in this commit.
+            }
+            const after = entries(JSON.parse(fs.readFileSync(tokenFile, 'utf8')));
+
+            const added = Object.keys(after).filter((k) => !(k in before)).sort();
+            const updated = Object.keys(after)
+              .filter((k) => k in before && before[k] !== after[k])
+              .sort();
+            const removed = Object.keys(before).filter((k) => !(k in after)).sort();
+
+            const section = (title, paths) => {
+              if (paths.length === 0) return '';
+              const shown = paths.slice(0, 50).map((p) => `- \`${p}\``);
+              if (paths.length > shown.length) shown.push(`- …and ${paths.length - shown.length} more`);
+              return `### ${title} (${paths.length})\n${shown.join('\n')}\n\n`;
+            };
+
+            const summary = [
+              `**Hierarchy**: \`${hierarchy}\` · **Mode**: \`${process.env.MODE.replace(/[^a-z]/g, '')}\``,
+              '',
+              `${added.length} added, ${updated.length} updated, ${removed.length} removed.`,
+              '',
+              section('Added', added) + section('Updated', updated) + section('Removed', removed),
+            ].join('\n').trim();
 
             const prBody = [
               '## Token Import',

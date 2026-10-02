@@ -385,13 +385,6 @@ export interface ImportData {
   json: string;
 }
 
-export interface ImportSummary {
-  added: string[];
-  updated: string[];
-  removed: string[];
-  unchanged: number;
-}
-
 function isLeaf(node: unknown): boolean {
   return (
     !!node &&
@@ -400,39 +393,13 @@ function isLeaf(node: unknown): boolean {
   );
 }
 
-/**
- * Records every addressable entry of a tree as `path -> serialized value`:
- * token leaves, plus group-level DTCG metadata such as an inherited `$type`.
- * Group metadata is included so that retyping a group is reported as a change
- * rather than passing silently — the leaves below it are untouched but their
- * effective type is not.
- */
-function collectEntries(
-  node: TokenTree,
-  path: string[] = [],
-  out: Map<string, string> = new Map(),
-): Map<string, string> {
-  if (isLeaf(node)) {
-    out.set(path.join("."), JSON.stringify(node));
-    return out;
-  }
-
-  for (const [key, child] of Object.entries(node)) {
-    const childPath = [...path, key];
-    if (isDtcgMetadataKey(key)) {
-      out.set(childPath.join("."), JSON.stringify(child));
-    } else if (child && typeof child === "object") {
-      collectEntries(child as TokenTree, childPath, out);
-    }
-  }
-
-  return out;
-}
-
 /** Every token path in a tree, ignoring DTCG metadata keys. */
-export function collectLeafPaths(node: TokenTree): string[] {
-  return [...collectEntries(node).keys()].filter(
-    (path) => !path.split(".").some(isDtcgMetadataKey),
+export function collectLeafPaths(node: TokenTree, path: string[] = []): string[] {
+  if (isLeaf(node)) return [path.join(".")];
+  return Object.entries(node).flatMap(([key, child]) =>
+    isDtcgMetadataKey(key) || !child || typeof child !== "object"
+      ? []
+      : collectLeafPaths(child as TokenTree, [...path, key]),
   );
 }
 
@@ -464,40 +431,13 @@ export function mergeTokenTrees(
   return target;
 }
 
-/** Renders an import summary as markdown for the PR body. */
-export function formatImportSummary(
-  summary: ImportSummary,
-  data: ImportData,
-): string {
-  const cap = 50;
-  const section = (title: string, entries: string[]): string => {
-    if (entries.length === 0) return "";
-    const shown = entries.slice(0, cap).map((e) => `- \`${e}\``);
-    const rest = entries.length - shown.length;
-    if (rest > 0) shown.push(`- …and ${rest} more`);
-    return `### ${title} (${entries.length})\n${shown.join("\n")}\n\n`;
-  };
-
-  const header =
-    `**Hierarchy**: \`${data.hierarchy}\` · **Mode**: \`${data.mode}\`\n\n` +
-    `${summary.added.length} added, ${summary.updated.length} updated, ` +
-    `${summary.removed.length} removed, ${summary.unchanged} unchanged.\n\n`;
-
-  return (
-    header +
-    section("Added", summary.added) +
-    section("Updated", summary.updated) +
-    section("Removed", summary.removed)
-  ).trim();
-}
-
 /**
  * Imports a DTCG JSON document into one hierarchy.
  *
  * The document is assumed DTCG-conform and is not normalized: `$type` stays on
  * whichever group or token declared it, and the validator resolves inheritance.
  */
-export function importTokens(data: ImportData): ImportSummary {
+export function importTokens(data: ImportData): void {
   const hierarchy = data.hierarchy;
 
   if (data.json.trim().length === 0) {
@@ -523,33 +463,14 @@ export function importTokens(data: ImportData): ImportSummary {
   assertValidPaths(collectLeafPaths(incoming));
 
   const filePath = getTokenFilePath(hierarchy);
-  const before = collectEntries(readTokenFile(filePath));
 
   const tree =
     data.mode === "replace"
       ? incoming
       : mergeTokenTrees(readTokenFile(filePath), incoming);
 
-  const after = collectEntries(tree);
-
-  const summary: ImportSummary = {
-    added: [...after.keys()].filter((k) => !before.has(k)).sort(),
-    updated: [...after.keys()]
-      .filter((k) => before.has(k) && before.get(k) !== after.get(k))
-      .sort(),
-    removed: [...before.keys()].filter((k) => !after.has(k)).sort(),
-    unchanged: [...after.keys()].filter((k) => before.get(k) === after.get(k))
-      .length,
-  };
-
   assertTreeValid(tree, hierarchy);
   writeTokenFile(filePath, tree);
 
-  console.log(
-    `✅ Imported into '${hierarchy}' (${data.mode}): ${summary.added.length} added, ` +
-      `${summary.updated.length} updated, ${summary.removed.length} removed, ` +
-      `${summary.unchanged} unchanged.`,
-  );
-
-  return summary;
+  console.log(`✅ Imported into '${hierarchy}' (${data.mode}).`);
 }

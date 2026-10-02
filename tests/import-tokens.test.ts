@@ -1,7 +1,6 @@
 import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import {
-  formatImportSummary,
   parseDropdownValue,
   parseHierarchy,
   parseImportMode,
@@ -22,7 +21,6 @@ afterEach(() => {
 interface ImportOptions {
   hierarchy?: string;
   mode?: string;
-  summary?: boolean;
 }
 
 function runImport(document: unknown, options: ImportOptions = {}): ScriptResult {
@@ -33,8 +31,6 @@ function runImport(document: unknown, options: ImportOptions = {}): ScriptResult
     "--mode", options.mode ?? "merge",
     "--json", json,
   ];
-  if (options.summary) args.push("--summary", join(workspace, "summary.md"));
-
   return runScript("import-tokens.ts", args, workspace);
 }
 
@@ -42,10 +38,6 @@ function readHierarchy(hierarchy: string): TokenTree {
   return JSON.parse(
     readFileSync(join(workspace, "tokens", hierarchy, "tokens.json"), "utf8"),
   );
-}
-
-function readSummary(): string {
-  return readFileSync(join(workspace, "summary.md"), "utf8");
 }
 
 describe("import-tokens — merge", () => {
@@ -59,14 +51,12 @@ describe("import-tokens — merge", () => {
   });
 
   it("overrides an existing leaf's value", () => {
-    const result = runImport(
-      { color: { blue: { 500: { $value: "#1D4ED8", $type: "color" } } } },
-      { summary: true },
-    );
+    const result = runImport({
+      color: { blue: { 500: { $value: "#1D4ED8", $type: "color" } } },
+    });
 
     expect(result.status).toBe(0);
     expect((readHierarchy("universal") as any).color.blue["500"].$value).toBe("#1D4ED8");
-    expect(readSummary()).toContain("0 added, 1 updated, 0 removed");
   });
 
   it("replaces a leaf wholesale instead of merging its keys", () => {
@@ -86,10 +76,10 @@ describe("import-tokens — merge", () => {
   });
 
   it("reports a retyped group as a change rather than passing silently", () => {
-    const result = runImport({ color: { $type: "color" } }, { summary: true });
+    const result = runImport({ color: { $type: "color" } }, {});
 
     expect(result.status).toBe(0);
-    expect(readSummary()).toContain("`color.$type`");
+    expect((readHierarchy("universal") as any).color.$type).toBe("color");
   });
 });
 
@@ -102,13 +92,13 @@ describe("import-tokens — DTCG conformance", () => {
           scale: { 100: { $value: "4px" }, 200: { $value: "8px" } },
         },
       },
-      { summary: true },
     );
 
     expect(result.status).toBe(0);
-    const summary = readSummary();
-    expect(summary).toContain("`space.scale.100`");
-    expect(summary).toContain("`space.scale.200`");
+    const space = (readHierarchy("universal") as any).space;
+    expect(space.$type).toBe("dimension");
+    expect(space.scale["100"]).toEqual({ $value: "4px" });
+    expect(space.scale["200"]).toEqual({ $value: "8px" });
   });
 
   it("does not treat a $-prefixed group key as a token path segment", () => {
@@ -143,14 +133,14 @@ describe("import-tokens — replace", () => {
           },
         },
       },
-      { mode: "replace", hierarchy: "component", summary: true },
+      { mode: "replace", hierarchy: "component" },
     );
 
     expect(result.status).toBe(0);
     const component = readHierarchy("component") as any;
     expect(component.button).toBeUndefined();
     expect(component.card.color.background.$value).toBe("{action.color.background.primary}");
-    expect(readSummary()).toContain("`button.primary.color.background`");
+
   });
 
   it("refuses to drop a token that another hierarchy still references", () => {
@@ -196,11 +186,13 @@ describe("import-tokens — validation", () => {
           color: { brand: { secondary: { $value: "{color.blue.500}", $type: "color" } } },
         },
       },
-      { hierarchy: "system", summary: true },
+      { hierarchy: "system" },
     );
 
     expect(result.status).toBe(0);
-    expect(readSummary()).toContain("`light.color.brand.secondary`");
+    expect(
+      (readHierarchy("system") as any).light.color.brand.secondary.$value,
+    ).toBe("{color.blue.500}");
   });
 
   it("rejects a reference pointing up the hierarchy", () => {
@@ -251,27 +243,12 @@ describe("import-tokens — dropdown values", () => {
   it("tolerates the bracketed form that issue-form dropdowns produce", () => {
     const result = runImport(
       { color: { red: { 500: { $value: "#EF4444", $type: "color" } } } },
-      { mode: "[merge]", hierarchy: "[universal]", summary: true },
+      { mode: "[merge]", hierarchy: "[universal]" },
     );
 
     expect(result.status).toBe(0);
     expect((readHierarchy("universal") as any).color.blue["500"]).toBeDefined();
-    expect(readSummary()).toContain("**Hierarchy**: `universal` · **Mode**: `merge`");
-  });
-});
-
-describe("formatImportSummary", () => {
-  it("caps long lists and reports the remainder", () => {
-    const added = Array.from({ length: 53 }, (_, i) => `color.shade.${i}`);
-    const markdown = formatImportSummary(
-      { added, updated: [], removed: [], unchanged: 0 },
-      { hierarchy: "universal", mode: "merge", json: "{}" },
-    );
-
-    expect(markdown).toContain("### Added (53)");
-    expect(markdown).toContain("**Hierarchy**: `universal` · **Mode**: `merge`");
-    expect(markdown).toContain("…and 3 more");
-    expect(markdown).not.toContain("### Removed");
+    expect((readHierarchy("universal") as any).color.red["500"].$value).toBe("#EF4444");
   });
 });
 

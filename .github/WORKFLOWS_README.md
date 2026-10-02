@@ -129,7 +129,10 @@ If labels are invalid (e.g., both `create` and `update`, or missing action label
     untrusted text is never interpolated into the script body by `${{ }}` — which
     is what would let a document full of quotes and backticks break out
   - Merges it onto, or replaces, `tokens/{hierarchy}/tokens.json`
-  - Creates a PR whose body is the summary the script wrote
+  - Summarises the change in the PR body by diffing the committed token file
+    against its parent with `git show HEAD~1:` — the same flatten-and-compare
+    shape as the "Token Build Preview" comment. The script itself writes no
+    files and returns nothing
 
 #### Import modes
 
