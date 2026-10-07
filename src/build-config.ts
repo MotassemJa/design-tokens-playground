@@ -1,4 +1,9 @@
-import type { Config, DesignTokens, File, PlatformConfig } from "style-dictionary/types";
+import type {
+  Config,
+  DesignTokens,
+  File,
+  PlatformConfig,
+} from "style-dictionary/types";
 
 /**
  * Build toggles and output customization used by the token build pipeline.
@@ -100,6 +105,12 @@ export class BuildConfig {
     return {
       tokens,
       platforms,
+      log: {
+        errors: {
+          brokenReferences: "throw",
+        },
+        verbosity: "verbose",
+      },
     };
   }
 }

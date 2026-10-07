@@ -45,17 +45,13 @@
     "design-tokens",
     "design-system",
     "style-dictionary",
-    "tokenscript-interpreter",
     "tokens",
     "css",
     "variables",
     "typescript",
     "javascript",
     "clamp",
-    "css-functions",
-    "advanced-token-processing",
-    "domain-specific-language",
-    "token-computation"
+    "css-functions"
   ],
   "repository": {
     "type": "git",
@@ -77,8 +73,5 @@
     "tsx": "^4.0.0",
     "typescript": "^5.0.0",
     "yargs": "^18.0.0"
-  },
-  "dependencies": {
-    "@tokens-studio/tokenscript-interpreter": "0.32.0"
   }
 }

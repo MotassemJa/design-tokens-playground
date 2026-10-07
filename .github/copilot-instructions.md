@@ -27,7 +27,7 @@ Notes: There is no dedicated lint script. For a minimal build omitting specific 
 - src/ — build pipeline and utilities:
   - `index.ts` — CLI / build entry that parses flags and drives the build pipeline.
   - `build-config.ts` — Style Dictionary platform configuration and `BuildOptions` interface.
-  - `build-tokens.ts` — end-to-end build orchestration (load → validate → interpret → Style Dictionary → JSON output).
+  - `build-tokens.ts` — end-to-end build orchestration (load → validate → Style Dictionary → JSON output).
   - `token-loader.ts` — loads and merges `tokens/{hierarchy}/tokens.json`; enforces strict directory layout.
   - `token-validator.ts` — enforces Curtis Nathan naming convention and 4-layer hierarchy reference rules.
 - dist/ — generated artifacts consumed by downstream packages:

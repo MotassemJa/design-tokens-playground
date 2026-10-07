@@ -1,17 +1,15 @@
 /**
- * Minimal test runner for the token validation + tokenscript pipeline.
+ * Minimal test runner for token validation.
  *
  * For each fixture directory under `tests/fixtures/<name>/`, it:
  *   1. loads tokens via `TokenLoader`
  *   2. runs `TokenValidator` (naming + hierarchy)
- *   3. runs `processTokens` (tokenscript) for value validation
  *
  * Fixtures whose directory name starts with `invalid-` are expected to fail.
  * Every other fixture must pass all checks.
  */
 import { readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { builders, processTokens } from "@tokens-studio/tokenscript-interpreter";
 import { TokenLoader, type Hierarchy } from "../src/token-loader.js";
 import type { DesignTokens } from "style-dictionary/types";
 import { TokenValidator } from "../src/token-validator.js";
@@ -35,29 +33,11 @@ function runFixture(fixtureName: string): TestResult {
   try {
     const loader = new TokenLoader(fixtureDir);
     const tokensByHierarchy = loader.loadTokensByHierarchy();
-    const tokens = loader.loadTokens();
 
     const validator = new TokenValidator();
     if (!validator.validate(tokensByHierarchy)) {
       actual = "fail";
       details.push(...validator.getErrors().map((e) => `[validator] ${e}`));
-    }
-
-    // Only run tokenscript when static validation passes so we get clearer failures.
-    if (actual === "pass") {
-      const result = processTokens(tokens, { builder: new builders.FlatObjectBuilder() });
-      if (result.issues && result.issues.size > 0) {
-        actual = "fail";
-        for (const [path, issues] of result.issues) {
-          for (const issue of issues) {
-            const msg =
-              issue && typeof issue === "object" && "message" in issue
-                ? (issue as { message: string }).message
-                : JSON.stringify(issue);
-            details.push(`[tokenscript] ${path}: ${msg}`);
-          }
-        }
-      }
     }
   } catch (error) {
     actual = "fail";

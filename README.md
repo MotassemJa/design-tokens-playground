@@ -133,8 +133,7 @@ group fields — see the inline examples in each form for guidance.
 
 - Loads and merges `tokens/{universal,system,semantic,component}/tokens.json`
 - Validates Curtis Nathan naming + 4-layer hierarchy references
-- Runs TokenScript (`@tokens-studio/tokenscript-interpreter`) for value interpretation and validation
-- Resolves token references for the resolved JSON output
+- Resolves token references with Style Dictionary for the resolved JSON outputs
 - Builds CSS, JS, and TypeScript outputs via Style Dictionary
 
 ## What This Repository Does Not Try To Do
@@ -186,8 +185,10 @@ fully implement all requirements from the current DTCG draft modules.
 
 ### Error and conformance behavior
 
-- Build-time interpretation issues are surfaced as warnings, and the pipeline can
-  continue, rather than enforcing strict fail-fast conformance in all cases.
+- Token values are not interpreted or computed: `oklch(...)`, `clamp(...)` and
+  other CSS functions pass through as written, with references substituted.
+  Value shapes are not validated beyond what Style Dictionary's transforms need;
+  a transform that cannot handle a value logs a warning and the build continues.
 
 ### Scope note
 
@@ -205,15 +206,6 @@ npm run preview
 
 This builds first, then serves `preview/index.html` and reads from `dist/tokens.resolved.json`.
 
-## TokenScript Schema Examples
-
-Example schema specs for extending TokenScript with `oklch(...)` and a safe
-`clamp_string(...)` helper are available in:
-
-- `examples/tokenscript-schemas/`
-
-These are reference examples and are not auto-registered by this repository's
-runtime pipeline.
 
 ## Automation
 

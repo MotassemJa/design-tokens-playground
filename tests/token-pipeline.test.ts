@@ -1,14 +1,20 @@
-import { builders, processTokens } from "@tokens-studio/tokenscript-interpreter";
+import StyleDictionary from "style-dictionary";
 import { createFixtureLoader, validateFixture } from "./test-helpers.js";
 
 describe("token fixture pipeline", () => {
-  it("interprets the valid fixture without TokenScript issues", () => {
-    const loader = createFixtureLoader("valid");
-    const result = processTokens(loader.loadTokens(), {
-      builder: new builders.FlatObjectBuilder(),
+  it("resolves every reference in the valid fixture", async () => {
+    const sd = new StyleDictionary({
+      tokens: createFixtureLoader("valid").loadTokens(),
+      platforms: { resolved: {} },
     });
+    // tokenMap, not allTokens: under Jest's VM modules SD's plain-object check
+    // fails across realms and leaves allTokens empty. tsx builds are unaffected.
+    const { tokenMap } = await sd.getPlatformTokens("resolved");
 
-    expect(result.issues?.size ?? 0).toBe(0);
+    expect(tokenMap.size).toBeGreaterThan(0);
+    for (const token of tokenMap.values()) {
+      expect(JSON.stringify(token.$value)).not.toMatch(/\{[^}]+\}/);
+    }
   });
 
   it.each([
