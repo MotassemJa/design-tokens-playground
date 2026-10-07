@@ -141,7 +141,8 @@ If labels are invalid (e.g., both `create` and `update`, or missing action label
 | `merge` | Overlays the document. Tokens not mentioned are kept; tokens mentioned are replaced outright, so stale `$type` / `$description` does not linger. |
 | `replace` | The document becomes the whole file. Anything missing from it is removed, and the import is rejected if another layer still references what would go. |
 
-The document is taken as DTCG-conform and is not normalized: `$type` may sit on a
+The document is taken as DTCG (legacy Style Dictionary `value`/`type` JSON is
+converted to it) and is not otherwise normalized: `$type` may sit on a
 group and be inherited by its descendants.
 
 #### Size ceiling

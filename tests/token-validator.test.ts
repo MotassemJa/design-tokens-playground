@@ -1,5 +1,6 @@
 import type { Hierarchy } from "../src/token-loader.js";
-import { TokenValidator, type TokenGroup } from "../src/token-validator.js";
+import type { DesignTokens } from "style-dictionary/types";
+import { TokenValidator } from "../src/token-validator.js";
 import { loadFixtureTokensByHierarchy, validateFixture } from "./test-helpers.js";
 
 describe("TokenValidator.validatePath", () => {
@@ -50,13 +51,13 @@ describe("TokenValidator", () => {
 
     expect(validator.getErrors()).toEqual(
       expect.arrayContaining([
-        expect.stringContaining("references 'does.not.exist' which does not exist in any hierarchy"),
+        expect.stringContaining("Tries to reference does.not.exist, which is not defined."),
       ])
     );
   });
 
   it("requires $type on a token with no ancestor group $type", () => {
-    const tokensByHierarchy = new Map<Hierarchy, TokenGroup>([
+    const tokensByHierarchy = new Map<Hierarchy, DesignTokens>([
       [
         "universal",
         {
@@ -79,7 +80,7 @@ describe("TokenValidator", () => {
   });
 
   it("inherits $type from an ancestor group (DTCG)", () => {
-    const tokensByHierarchy = new Map<Hierarchy, TokenGroup>([
+    const tokensByHierarchy = new Map<Hierarchy, DesignTokens>([
       [
         "universal",
         {
@@ -102,7 +103,7 @@ describe("TokenValidator", () => {
   });
 
   it("does not treat DTCG metadata keys as path segments", () => {
-    const tokensByHierarchy = new Map<Hierarchy, TokenGroup>([
+    const tokensByHierarchy = new Map<Hierarchy, DesignTokens>([
       [
         "universal",
         {
@@ -121,7 +122,7 @@ describe("TokenValidator", () => {
   });
 
   it("lets a token's own $type win over the group's", () => {
-    const tokensByHierarchy = new Map<Hierarchy, TokenGroup>([
+    const tokensByHierarchy = new Map<Hierarchy, DesignTokens>([
       [
         "universal",
         {
@@ -138,7 +139,7 @@ describe("TokenValidator", () => {
   });
 
   it("resolves references declared inside a group-typed tree", () => {
-    const tokensByHierarchy = new Map<Hierarchy, TokenGroup>([
+    const tokensByHierarchy = new Map<Hierarchy, DesignTokens>([
       [
         "universal",
         {
@@ -172,7 +173,7 @@ describe("TokenValidator", () => {
   });
 
   it("allows references within the same hierarchy", () => {
-    const tokensByHierarchy = new Map<Hierarchy, TokenGroup>([
+    const tokensByHierarchy = new Map<Hierarchy, DesignTokens>([
       [
         "system",
         {

@@ -81,7 +81,6 @@ src/
   build-config.ts
   build-tokens.ts
   token-loader.ts
-  token-reference-resolver.ts
   token-validator.ts
 
 tests/
@@ -236,7 +235,8 @@ into the form, and writes it into one hierarchy:
 GitHub caps an issue body at 65,536 characters and rejects a longer one on submit.
 The form states the resulting token ceiling for each way of writing them.
 
-The document is taken as DTCG-conform and is not normalized — in particular
+The document is taken as DTCG (legacy Style Dictionary `value`/`type` JSON is
+converted to it) and is not otherwise normalized — in particular
 `$type` may sit on a **group** and be inherited by everything below it:
 
 ```json

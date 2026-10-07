@@ -3,7 +3,8 @@ import { cpSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { TokenLoader, type Hierarchy } from "../src/token-loader.js";
-import { TokenValidator, type TokenGroup } from "../src/token-validator.js";
+import type { DesignTokens } from "style-dictionary/types";
+import { TokenValidator } from "../src/token-validator.js";
 
 const REPO_ROOT = process.cwd();
 const FIXTURES_DIR = join(REPO_ROOT, "tests", "fixtures");
@@ -17,8 +18,8 @@ export function createFixtureLoader(name: string): TokenLoader {
   return new TokenLoader(getFixtureDir(name));
 }
 
-export function loadFixtureTokensByHierarchy(name: string): Map<Hierarchy, TokenGroup> {
-  return createFixtureLoader(name).loadTokensByHierarchy() as Map<Hierarchy, TokenGroup>;
+export function loadFixtureTokensByHierarchy(name: string): Map<Hierarchy, DesignTokens> {
+  return createFixtureLoader(name).loadTokensByHierarchy();
 }
 
 export function validateFixture(name: string): TokenValidator {

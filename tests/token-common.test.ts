@@ -1,6 +1,6 @@
 import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import type { TokenLeaf, TokenTree } from "../.github/scripts/token-common.js";
+import type { DesignToken, DesignTokens } from "style-dictionary/types";
 import { createTokenWorkspace, runScript } from "./test-helpers.js";
 
 let workspace: string;
@@ -13,7 +13,7 @@ afterEach(() => {
   rmSync(workspace, { recursive: true, force: true });
 });
 
-function readHierarchy(hierarchy: string): TokenTree {
+function readHierarchy(hierarchy: string): DesignTokens {
   return JSON.parse(
     readFileSync(join(workspace, "tokens", hierarchy, "tokens.json"), "utf8"),
   );
@@ -37,7 +37,7 @@ describe("create-token", () => {
       workspace,
     );
 
-    expect(result.output).not.toContain("does not exist in any hierarchy");
+    expect(result.output).not.toContain("which is not defined");
     expect(result.status).toBe(0);
     expect((readHierarchy("semantic") as any).action.color.background.secondary.$value).toBe(
       "{light.color.brand.primary}",
@@ -60,7 +60,7 @@ describe("create-token", () => {
     );
 
     expect(result.status).not.toBe(0);
-    expect(result.output).toContain("does not exist in any hierarchy");
+    expect(result.output).toContain("which is not defined");
   });
 
   it("rejects a reference pointing up the hierarchy", () => {
@@ -127,7 +127,7 @@ describe("delete-token", () => {
 
     expect(result.status).not.toBe(0);
     expect(result.output).toContain(
-      "references 'color.blue.500' which does not exist in any hierarchy",
+      "Tries to reference color.blue.500, which is not defined.",
     );
   });
 
@@ -160,7 +160,7 @@ describe("update-token", () => {
     writeFileSync(file, JSON.stringify(tree, null, 2));
   }
 
-  function readLeaf(): TokenLeaf {
+  function readLeaf(): DesignToken {
     return (readHierarchy("design-values") as any).blue["500"].lightness;
   }
 

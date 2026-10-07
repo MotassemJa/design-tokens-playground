@@ -1,5 +1,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
+import type { DesignToken, DesignTokens, TransformedTokens } from "style-dictionary/types";
+import { convertTokenData, stripMeta, typeDtcgDelegate } from "style-dictionary/utils";
 
 const TOKENS_ROOT = "tokens";
 const TOKEN_FILENAME = "tokens.json";
@@ -7,6 +9,21 @@ const ALLOWED_HIERARCHIES = ["design-values", "universal", "system", "semantic",
 
 export type Hierarchy = (typeof ALLOWED_HIERARCHIES)[number];
 export { ALLOWED_HIERARCHIES, TOKEN_FILENAME, TOKENS_ROOT };
+
+/**
+ * Flattens a tree into Style Dictionary's token map, keyed `{a.b.c}`. Group
+ * `$type` is delegated onto each token first, so every entry carries its own
+ * effective type.
+ */
+export function toTokenMap(tree: DesignTokens): Map<string, DesignToken> {
+  return convertTokenData(typeDtcgDelegate(tree), { output: "map", usesDtcg: true });
+}
+
+/** Rebuilds a tree from {@link toTokenMap} output, dropping SD's `key` prop. */
+export function fromTokenMap(map: Map<string, DesignToken>): DesignTokens {
+  const tree = convertTokenData(map, { output: "object", usesDtcg: true }) as TransformedTokens;
+  return stripMeta(tree, { usesDtcg: true, strip: ["key"] }) as DesignTokens;
+}
 
 /**
  * Loads and merges token files from `tokens/{hierarchy}/tokens.json`.
@@ -24,20 +41,20 @@ export class TokenLoader {
    * This is the primary load method — use it when hierarchy context is needed
    * (e.g. for reference validation).
    */
-  loadTokensByHierarchy(): Map<Hierarchy, Record<string, unknown>> {
+  loadTokensByHierarchy(): Map<Hierarchy, DesignTokens> {
     if (!existsSync(this.rootDir)) {
       throw new Error(`Token directory '${this.rootDir}' does not exist.`);
     }
 
     this.assertLayoutStrict();
 
-    const result = new Map<Hierarchy, Record<string, unknown>>();
+    const result = new Map<Hierarchy, DesignTokens>();
 
     for (const hierarchy of ALLOWED_HIERARCHIES) {
       const filePath = join(this.rootDir, hierarchy, TOKEN_FILENAME);
       if (!existsSync(filePath)) continue;
 
-      let content: Record<string, unknown>;
+      let content: DesignTokens;
       try {
         content = JSON.parse(readFileSync(filePath, "utf-8"));
       } catch (error) {
@@ -58,14 +75,17 @@ export class TokenLoader {
     return result;
   }
 
-  /** Loads and merges all hierarchy token trees into a single flat object. */
-  loadTokens(): Record<string, unknown> {
-    const byHierarchy = this.loadTokensByHierarchy();
-    const merged: Record<string, unknown> = {};
-    for (const content of byHierarchy.values()) {
-      this.mergeTokens(merged, content);
+  /**
+   * Merges every hierarchy into one tree; a later layer wins on a duplicate
+   * path. Group `$type` ends up on each token, and other group-level metadata
+   * (`$description`, `$extensions`) is dropped.
+   */
+  loadTokens(): DesignTokens {
+    const merged = new Map<string, DesignToken>();
+    for (const tree of this.loadTokensByHierarchy().values()) {
+      for (const [key, token] of toTokenMap(tree)) merged.set(key, token);
     }
-    return merged;
+    return fromTokenMap(merged);
   }
 
   private assertLayoutStrict(): void {
@@ -96,20 +116,6 @@ export class TokenLoader {
             `Unexpected file '${entry.name}/${name}'. Only '${TOKEN_FILENAME}' is permitted per hierarchy.`
           );
         }
-      }
-    }
-  }
-
-  private mergeTokens(target: Record<string, unknown>, source: Record<string, unknown>): void {
-    for (const key in source) {
-      const value = source[key];
-      if (value && typeof value === "object" && !Array.isArray(value)) {
-        if (!target[key] || typeof target[key] !== "object") {
-          target[key] = {};
-        }
-        this.mergeTokens(target[key] as Record<string, unknown>, value as Record<string, unknown>);
-      } else {
-        target[key] = value;
       }
     }
   }

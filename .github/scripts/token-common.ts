@@ -1,5 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import type { DesignToken, DesignTokens } from "style-dictionary/types";
+import { convertToDTCG, flattenTokens } from "style-dictionary/utils";
 import {
   ALLOWED_HIERARCHIES,
   TOKEN_FILENAME,
@@ -7,39 +9,7 @@ import {
   TokenLoader,
   type Hierarchy,
 } from "../../src/token-loader";
-import {
-  TokenValidator,
-  isDtcgMetadataKey,
-  type DesignTokenValue,
-  type TokenGroup,
-} from "../../src/token-validator";
-
-/**
- * A DTCG token: `$value` plus the reserved properties `$type`,
- * `$description`, `$extensions` and `$deprecated`. Aliased to the build
- * pipeline's type so the two cannot drift — a leaf the validator accepts is a
- * leaf these scripts can write.
- */
-export type TokenLeaf = DesignTokenValue;
-
-/**
- * A DTCG group: child tokens and groups, plus the group-level reserved
- * properties. `$type` on a group is inherited by every descendant without one,
- * so it is a plain value rather than a nested node.
- */
-export interface TokenTree {
-  [key: string]:
-    | TokenLeaf
-    | TokenTree
-    | string
-    | boolean
-    | Record<string, unknown>
-    | undefined;
-  $type?: string;
-  $description?: string;
-  $extensions?: Record<string, unknown>;
-  $deprecated?: boolean | string;
-}
+import { TokenValidator, isDtcgMetadataKey } from "../../src/token-validator";
 
 /**
  * Input payload from issue-form / CLI.
@@ -163,19 +133,19 @@ export function getTokenFilePath(hierarchy: Hierarchy): string {
   return join(dir, TOKEN_FILENAME);
 }
 
-export function readTokenFile(filePath: string): TokenTree {
+export function readTokenFile(filePath: string): DesignTokens {
   if (!existsSync(filePath)) return {};
-  return JSON.parse(readFileSync(filePath, "utf8")) as TokenTree;
+  return JSON.parse(readFileSync(filePath, "utf8")) as DesignTokens;
 }
 
-export function writeTokenFile(filePath: string, data: TokenTree): void {
+export function writeTokenFile(filePath: string, data: DesignTokens): void {
   writeFileSync(filePath, JSON.stringify(data, null, 2) + "\n");
 }
 
 /**
  * Parses a raw value into a DTCG leaf (JSON object or string).
  */
-export function parseTokenValue(value: string): TokenLeaf {
+export function parseTokenValue(value: string): DesignToken {
   try {
     const parsed = JSON.parse(value);
     return { $value: parsed };
@@ -185,16 +155,16 @@ export function parseTokenValue(value: string): TokenLeaf {
 }
 
 export function getNested(
-  tree: TokenTree,
+  tree: DesignTokens,
   tokenPath: string,
-): TokenLeaf | TokenTree | undefined {
+): DesignToken | DesignTokens | undefined {
   const parts = tokenPath.split(".");
-  let current: TokenLeaf | TokenTree | undefined = tree;
+  let current: DesignToken | DesignTokens | undefined = tree;
   for (const p of parts) {
     if (current && typeof current === "object" && p in current) {
       // A path segment is never a DTCG metadata key: `$type` is not kebab-case,
       // so assertValidPath rejects it long before we walk it.
-      current = (current as TokenTree)[p] as TokenLeaf | TokenTree | undefined;
+      current = (current as DesignTokens)[p] as DesignToken | DesignTokens | undefined;
     } else {
       return undefined;
     }
@@ -203,30 +173,30 @@ export function getNested(
 }
 
 export function setNested(
-  tree: TokenTree,
+  tree: DesignTokens,
   tokenPath: string,
-  value: TokenLeaf,
+  value: DesignToken,
 ): void {
   const parts = tokenPath.split(".");
-  let cursor: TokenTree = tree;
+  let cursor: DesignTokens = tree;
   for (let i = 0; i < parts.length - 1; i++) {
     const key = parts[i];
     const next = cursor[key];
     if (!next || typeof next !== "object" || "$value" in next) {
       cursor[key] = {};
     }
-    cursor = cursor[key] as TokenTree;
+    cursor = cursor[key] as DesignTokens;
   }
   cursor[parts[parts.length - 1]] = value;
 }
 
-export function deleteNested(tree: TokenTree, tokenPath: string): boolean {
+export function deleteNested(tree: DesignTokens, tokenPath: string): boolean {
   const parts = tokenPath.split(".");
-  let cursor: TokenTree = tree;
+  let cursor: DesignTokens = tree;
   for (let i = 0; i < parts.length - 1; i++) {
     const key = parts[i];
     if (!cursor[key] || typeof cursor[key] !== "object") return false;
-    cursor = cursor[key] as TokenTree;
+    cursor = cursor[key] as DesignTokens;
   }
   const last = parts[parts.length - 1];
   if (last in cursor) {
@@ -236,7 +206,7 @@ export function deleteNested(tree: TokenTree, tokenPath: string): boolean {
   return false;
 }
 
-export function cleanEmptyParents(tree: TokenTree, tokenPath: string): void {
+export function cleanEmptyParents(tree: DesignTokens, tokenPath: string): void {
   const parts = tokenPath.split(".");
   for (let i = parts.length - 1; i > 0; i--) {
     const parentPath = parts.slice(0, i).join(".");
@@ -274,13 +244,10 @@ export function assertValidPaths(tokenPaths: string[]): void {
  * carry no hierarchy prefix, so any cross-layer `{ref}` would be reported as
  * missing and every operation outside `design-values` would fail.
  */
-export function assertTreeValid(tree: TokenTree, hierarchy: Hierarchy): void {
+export function assertTreeValid(tree: DesignTokens, hierarchy: Hierarchy): void {
   const validator = new TokenValidator();
-  const byHierarchy = new TokenLoader().loadTokensByHierarchy() as Map<
-    Hierarchy,
-    TokenGroup
-  >;
-  byHierarchy.set(hierarchy, tree as TokenGroup);
+  const byHierarchy = new TokenLoader().loadTokensByHierarchy();
+  byHierarchy.set(hierarchy, tree);
   if (!validator.validate(byHierarchy)) {
     failWithList("❌ Token validation failed:", validator.getErrors());
   }
@@ -336,8 +303,8 @@ export function updateToken(data: TokenData): void {
   // Spread the existing leaf first: an update manages $value, $type and
   // $description, and must not drop $extensions, $deprecated or anything else
   // the token already carries.
-  const leaf: TokenLeaf = {
-    ...(existing as TokenLeaf),
+  const leaf: DesignToken = {
+    ...(existing as DesignToken),
     ...parseTokenValue(data.value ?? ""),
   };
   if (data.tokenType) leaf.$type = data.tokenType;
@@ -393,16 +360,6 @@ function isLeaf(node: unknown): boolean {
   );
 }
 
-/** Every token path in a tree, ignoring DTCG metadata keys. */
-export function collectLeafPaths(node: TokenTree, path: string[] = []): string[] {
-  if (isLeaf(node)) return [path.join(".")];
-  return Object.entries(node).flatMap(([key, child]) =>
-    isDtcgMetadataKey(key) || !child || typeof child !== "object"
-      ? []
-      : collectLeafPaths(child as TokenTree, [...path, key]),
-  );
-}
-
 /**
  * Deep-merges `incoming` onto `target`, stopping at token leaves.
  *
@@ -412,9 +369,9 @@ export function collectLeafPaths(node: TokenTree, path: string[] = []): string[]
  * stale metadata an override is meant to clear.
  */
 export function mergeTokenTrees(
-  target: TokenTree,
-  incoming: TokenTree,
-): TokenTree {
+  target: DesignTokens,
+  incoming: DesignTokens,
+): DesignTokens {
   for (const [key, value] of Object.entries(incoming)) {
     if (isDtcgMetadataKey(key) || isLeaf(value)) {
       target[key] = value;
@@ -425,7 +382,7 @@ export function mergeTokenTrees(
     if (!existing || typeof existing !== "object" || isLeaf(existing)) {
       target[key] = {};
     }
-    mergeTokenTrees(target[key] as TokenTree, value as TokenTree);
+    mergeTokenTrees(target[key] as DesignTokens, value as DesignTokens);
   }
 
   return target;
@@ -434,8 +391,9 @@ export function mergeTokenTrees(
 /**
  * Imports a DTCG JSON document into one hierarchy.
  *
- * The document is assumed DTCG-conform and is not normalized: `$type` stays on
- * whichever group or token declared it, and the validator resolves inheritance.
+ * The document is DTCG, or legacy Style Dictionary JSON converted to it. It is
+ * not otherwise normalized: `$type` stays on whichever group or token declared
+ * it, and the validator resolves inheritance.
  */
 export function importTokens(data: ImportData): void {
   const hierarchy = data.hierarchy;
@@ -458,9 +416,13 @@ export function importTokens(data: ImportData): void {
   if (!isTokenObject) {
     fail("❌ The DTCG JSON must contain a token object at the top level.");
   }
-  const incoming = parsed as TokenTree;
+  // A legacy Style Dictionary document (`value`/`type`/`description`) is
+  // converted to DTCG; a DTCG one passes through unchanged. Types stay where
+  // the document declared them.
+  const incoming = convertToDTCG(parsed as DesignTokens, { applyTypesToGroup: false });
 
-  assertValidPaths(collectLeafPaths(incoming));
+  // flattenTokens keys each leaf as `{a.b.c}`; strip the braces for the path.
+  assertValidPaths(flattenTokens(incoming, true).map((t) => t.key!.slice(1, -1)));
 
   const filePath = getTokenFilePath(hierarchy);
 

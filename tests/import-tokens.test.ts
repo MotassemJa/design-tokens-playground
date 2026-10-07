@@ -1,10 +1,10 @@
+import type { DesignTokens } from "style-dictionary/types";
 import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import {
   parseDropdownValue,
   parseHierarchy,
   parseImportMode,
-  type TokenTree,
 } from "../.github/scripts/token-common.js";
 import { createTokenWorkspace, runScript, type ScriptResult } from "./test-helpers.js";
 
@@ -34,7 +34,7 @@ function runImport(document: unknown, options: ImportOptions = {}): ScriptResult
   return runScript("import-tokens.ts", args, workspace);
 }
 
-function readHierarchy(hierarchy: string): TokenTree {
+function readHierarchy(hierarchy: string): DesignTokens {
   return JSON.parse(
     readFileSync(join(workspace, "tokens", hierarchy, "tokens.json"), "utf8"),
   );
@@ -48,6 +48,19 @@ describe("import-tokens — merge", () => {
     const universal = readHierarchy("universal") as any;
     expect(universal.color.blue["500"].$value).toBe("#3B82F6");
     expect(universal.color.red["500"].$value).toBe("#EF4444");
+  });
+
+  it("converts a legacy Style Dictionary document to DTCG", () => {
+    const result = runImport({
+      color: { red: { 500: { value: "#EF4444", type: "color", description: "legacy" } } },
+    });
+
+    expect(result.status).toBe(0);
+    expect((readHierarchy("universal") as any).color.red["500"]).toEqual({
+      $value: "#EF4444",
+      $type: "color",
+      $description: "legacy",
+    });
   });
 
   it("overrides an existing leaf's value", () => {
@@ -150,7 +163,7 @@ describe("import-tokens — replace", () => {
     );
 
     expect(result.status).not.toBe(0);
-    expect(result.output).toContain("does not exist in any hierarchy");
+    expect(result.output).toContain("which is not defined");
   });
 
   it("leaves the file untouched when the import is rejected", () => {
