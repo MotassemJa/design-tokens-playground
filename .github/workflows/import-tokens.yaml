@@ -67,16 +67,18 @@ jobs:
       # never interpolated into the script body by `${{ }}`, which is what would
       # let a document full of quotes and backticks break out.
       - name: Run import token script
+        id: import
         env:
           HIERARCHY: ${{ steps.parse.outputs.parsed_hierarchy }}
           MODE: ${{ steps.parse.outputs.parsed_mode }}
           TOKENS_JSON: ${{ steps.parse.outputs['parsed_tokens-json'] }}
         run: |
           set -euo pipefail
+          # The output is kept so a failure can be explained on the issue.
           npx tsx .github/scripts/import-tokens.ts \
             --hierarchy "$HIERARCHY" \
             --mode "$MODE" \
-            --json "$TOKENS_JSON"
+            --json "$TOKENS_JSON" 2>&1 | tee "$RUNNER_TEMP/import.log"
 
       - name: Commit and push changes
         id: commit
@@ -223,4 +225,70 @@ jobs:
               repo: context.repo.repo,
               issue_number: ${{ inputs.issue-number }},
               body: `⚠️ The import produced no changes. Every token in the document already exists with the same value, type and description.`
+            });
+
+      - name: Explain failure on the issue
+        if: failure()
+        uses: actions/github-script@v7
+        env:
+          MODE: ${{ steps.parse.outputs.parsed_mode }}
+          IMPORT_FAILED: ${{ steps.import.outcome == 'failure' }}
+        # The default github.token: a comment triggers nothing downstream, and it
+        # still works when ACTIONS_PAT is the reason the job failed.
+        with:
+          script: |
+            const fs = require('fs');
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const replace = (process.env.MODE || '').includes('replace');
+
+            let body;
+            if (process.env.IMPORT_FAILED !== 'true') {
+              // Parsing the form, pushing or opening the PR failed: nothing the
+              // requester can fix in the document.
+              body = `❌ The import could not be completed because of a problem in the workflow, not in your tokens. A maintainer can find the details in the [workflow run](${runUrl}).`;
+            } else {
+              const log = fs.readFileSync(`${process.env.RUNNER_TEMP}/import.log`, 'utf8').trim();
+
+              // One plain-language explanation per kind of error in the log.
+              const hints = [
+                [/Could not parse the DTCG JSON/, 'The pasted document is not valid JSON. Look for a missing comma, an unclosed bracket or a trailing comma near the position in the error.'],
+                [/The DTCG JSON was empty/, 'The token document field was empty. Paste the JSON document into it.'],
+                [/token object at the top level/, 'The document must be a JSON object (`{ … }`) at the top level, not an array or a single value.'],
+                [/Invalid hierarchy|Invalid mode/, 'The hierarchy or mode dropdown has an unexpected value. Edit the issue and pick one of the listed options.'],
+                [/not a valid DTCG name|must contain at least two segments/, 'Some token names are not allowed. A name cannot be empty, start with `$`, or contain `{` or `}`, and every token path needs at least two levels (e.g. `color.primary`).'],
+                [/both become/, 'Two tokens would get the same CSS/JS variable name (for example `lineHeights` and `line-heights`). Rename one of them.'],
+                [/Tries to reference .*, which is not defined/, replace
+                  ? '**Replace** mode makes the file exactly your document, so every token missing from it is deleted. Tokens in other layers still reference some of those, so the import was stopped. Add the referenced tokens to your document, use **merge** mode, or update the referencing tokens first.'
+                  : 'A token references another token that does not exist in any layer. Check the reference for typos, or add the missing token.'],
+                [/Hierarchy violation/, 'A token references a token in a higher layer. A layer may only reference itself and the layers below it: design-values → universal → system → semantic → component.'],
+                [/missing required \$type/, 'Some tokens have no `$type`. Set `$type` on the token or on one of its parent groups.'],
+              ].filter(([pattern]) => pattern.test(log)).map(([, hint]) => `- ${hint}`);
+
+              // A fence longer than any backtick run in the log, so the
+              // document's own text cannot close it. Capped below GitHub's
+              // 65,536-character comment limit.
+              const fence = '`'.repeat(Math.max(3, ...(log.match(/`+/g) || []).map((run) => run.length + 1)));
+              const details = log.length > 60000 ? `${log.slice(0, 60000)}\n…truncated` : log;
+
+              body = [
+                '❌ **The import was not applied.** Nothing was changed.',
+                '',
+                ...(hints.length ? ['**What went wrong**', ...hints, ''] : []),
+                'Edit the issue to fix the document, and the import runs again.',
+                '',
+                '<details><summary>Full error</summary>',
+                '',
+                fence,
+                details,
+                fence,
+                '',
+                '</details>',
+              ].join('\n');
+            }
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: ${{ inputs.issue-number }},
+              body,
             });
