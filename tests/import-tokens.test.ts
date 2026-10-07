@@ -232,6 +232,14 @@ describe("import-tokens — validation", () => {
     expect(result.output).toContain("must contain a token object");
   });
 
+  it("accepts a document wrapped in the ```json fence the issue form adds", () => {
+    const document = { color: { red: { 500: { $value: "#EF4444", $type: "color" } } } };
+    const result = runImport("```json\n" + JSON.stringify(document, null, 2) + "\n```");
+
+    expect(result.status).toBe(0);
+    expect((readHierarchy("universal") as any).color.red["500"].$value).toBe("#EF4444");
+  });
+
   it("rejects an empty document", () => {
     const result = runImport("   ");
 

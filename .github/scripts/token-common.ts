@@ -398,13 +398,17 @@ export function mergeTokenTrees(
 export function importTokens(data: ImportData): void {
   const hierarchy = data.hierarchy;
 
-  if (data.json.trim().length === 0) {
+  // The issue form renders the field with `render: json`, so GitHub wraps the
+  // value in a ```json … ``` fence. Take what is inside it.
+  const json = data.json.trim().replace(/^```[\w-]*|```$/g, "").trim();
+
+  if (json.length === 0) {
     fail("❌ The DTCG JSON was empty.");
   }
 
   let parsed: unknown;
   try {
-    parsed = JSON.parse(data.json);
+    parsed = JSON.parse(json);
   } catch (error) {
     fail(
       `❌ Could not parse the DTCG JSON: ${error instanceof Error ? error.message : String(error)}`,
