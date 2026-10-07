@@ -29,7 +29,6 @@ Notes: There is no dedicated lint script. For a minimal build omitting specific 
   - `build-config.ts` — Style Dictionary platform configuration and `BuildOptions` interface.
   - `build-tokens.ts` — end-to-end build orchestration (load → validate → interpret → Style Dictionary → JSON output).
   - `token-loader.ts` — loads and merges `tokens/{hierarchy}/tokens.json`; enforces strict directory layout.
-  - `token-reference-resolver.ts` — resolves `{path.to.token}` references for the resolved JSON artifact.
   - `token-validator.ts` — enforces Curtis Nathan naming convention and 4-layer hierarchy reference rules.
 - dist/ — generated artifacts consumed by downstream packages:
   - `dist/css/variables.css`, `dist/tokens.json`, `dist/tokens.resolved.json`, `dist/tokens.interpreted.json`, `dist/tokens.js`, `dist/tokens.d.ts`.

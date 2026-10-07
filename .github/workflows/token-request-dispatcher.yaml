@@ -31,16 +31,19 @@ jobs:
           has_create=false
           has_update=false
           has_delete=false
+          has_import=false
 
           [[ "$labels" == *",token-request,"* ]] && has_token_request=true
           [[ "$labels" == *",create,"* ]] && has_create=true
           [[ "$labels" == *",update,"* ]] && has_update=true
           [[ "$labels" == *",delete,"* ]] && has_delete=true
+          [[ "$labels" == *",import,"* ]] && has_import=true
 
           action_count=0
           $has_create && action_count=$((action_count + 1))
           $has_update && action_count=$((action_count + 1))
           $has_delete && action_count=$((action_count + 1))
+          $has_import && action_count=$((action_count + 1))
 
           if ! $has_token_request; then
             echo "action=none" >> "$GITHUB_OUTPUT"
@@ -58,6 +61,8 @@ jobs:
             echo "action=create" >> "$GITHUB_OUTPUT"
           elif $has_update; then
             echo "action=update" >> "$GITHUB_OUTPUT"
+          elif $has_import; then
+            echo "action=import" >> "$GITHUB_OUTPUT"
           else
             echo "action=delete" >> "$GITHUB_OUTPUT"
           fi
@@ -76,7 +81,7 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
-              body: 'This token request issue must have exactly one action label: create, update, or delete.'
+              body: 'This token request issue must have exactly one action label: create, update, delete, or import.'
             });
 
   create:
@@ -104,6 +109,16 @@ jobs:
     needs: route
     if: needs.route.outputs.action == 'delete'
     uses: ./.github/workflows/delete-token.yaml
+    with:
+      issue-number: ${{ github.event.issue.number }}
+      issue-title: ${{ github.event.issue.title }}
+      issue-body: ${{ github.event.issue.body }}
+    secrets: inherit
+
+  import:
+    needs: route
+    if: needs.route.outputs.action == 'import'
+    uses: ./.github/workflows/import-tokens.yaml
     with:
       issue-number: ${{ github.event.issue.number }}
       issue-title: ${{ github.event.issue.title }}

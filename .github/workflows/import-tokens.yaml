@@ -1,0 +1,226 @@
+name: Import Design Tokens
+
+on:
+  workflow_call:
+    inputs:
+      issue-number:
+        required: true
+        type: number
+      issue-title:
+        required: true
+        type: string
+      issue-body:
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  import-tokens:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Parse import issue
+        id: parse
+        uses: issue-ops/parser@v5
+        with:
+          body: ${{ inputs.issue-body }}
+          issue-form-template: import-tokens.yaml
+
+      - name: Create branch for changes
+        id: branch
+        env:
+          ISSUE_TITLE: ${{ inputs.issue-title }}
+          ISSUE_NUMBER: ${{ inputs.issue-number }}
+        run: |
+          set -euo pipefail
+          SLUG=$(printf '%s' "$ISSUE_TITLE" \
+            | sed 's/\[.*\] //' \
+            | tr '[:upper:]' '[:lower:]' \
+            | tr ' ' '-' \
+            | tr -cd '[:alnum:]-' \
+            | head -c 50)
+          BRANCH_NAME="token-request/${ISSUE_NUMBER}-import-${SLUG}"
+          echo "branch_name=$BRANCH_NAME" >> "$GITHUB_OUTPUT"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH_NAME"
+
+      # The JSON goes straight from the form to the script as one argument.
+      # Every value is a quoted expansion of an env var — the untrusted text is
+      # never interpolated into the script body by `${{ }}`, which is what would
+      # let a document full of quotes and backticks break out.
+      - name: Run import token script
+        env:
+          HIERARCHY: ${{ steps.parse.outputs.parsed_hierarchy }}
+          MODE: ${{ steps.parse.outputs.parsed_mode }}
+          TOKENS_JSON: ${{ steps.parse.outputs['parsed_tokens-json'] }}
+        run: |
+          set -euo pipefail
+          npx tsx .github/scripts/import-tokens.ts \
+            --hierarchy "$HIERARCHY" \
+            --mode "$MODE" \
+            --json "$TOKENS_JSON"
+
+      - name: Commit and push changes
+        id: commit
+        env:
+          ACTIONS_PAT: ${{ secrets.ACTIONS_PAT }}
+          ISSUE_TITLE: ${{ inputs.issue-title }}
+          ISSUE_NUMBER: ${{ inputs.issue-number }}
+        run: |
+          set -euo pipefail
+          git add tokens/
+          if git diff --staged --quiet; then
+            echo "changes=false" >> "$GITHUB_OUTPUT"
+            echo "No changes to commit"
+          else
+            if [ -n "${ACTIONS_PAT}" ]; then
+              git remote set-url origin "https://x-access-token:${ACTIONS_PAT}@github.com/${{ github.repository }}"
+            fi
+
+            git commit -m "feat(tokens): ${ISSUE_TITLE}" -m "Closes #${ISSUE_NUMBER}"
+            git push origin "${{ steps.branch.outputs.branch_name }}"
+            echo "changes=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create Pull Request
+        if: steps.commit.outputs.changes == 'true'
+        uses: actions/github-script@v7
+        env:
+          HIERARCHY: ${{ steps.parse.outputs.parsed_hierarchy }}
+          MODE: ${{ steps.parse.outputs.parsed_mode }}
+          DESCRIPTION: ${{ steps.parse.outputs.parsed_description }}
+          ISSUE_TITLE: ${{ inputs.issue-title }}
+          BRANCH_NAME: ${{ steps.branch.outputs.branch_name }}
+        with:
+          github-token: ${{ secrets.ACTIONS_PAT || github.token }}
+          script: |
+            const fs = require('fs');
+            const { execFileSync } = require('child_process');
+            const issueNumber = ${{ inputs.issue-number }};
+
+            // Summarise the commit we just pushed by diffing the token file
+            // against its parent. Same flatten-and-compare shape as the
+            // "Token Build Preview" comment in build-tokens.yaml.
+            const hierarchy = process.env.HIERARCHY.replace(/[^a-z-]/g, '');
+            const tokenFile = `tokens/${hierarchy}/tokens.json`;
+
+            const entries = (node, prefix = '') => {
+              const out = {};
+              if (node && typeof node === 'object' && '$value' in node) {
+                out[prefix] = JSON.stringify(node);
+                return out;
+              }
+              for (const [key, child] of Object.entries(node ?? {})) {
+                const path = prefix ? `${prefix}.${key}` : key;
+                if (key.startsWith('$')) out[path] = JSON.stringify(child);
+                else if (child && typeof child === 'object') Object.assign(out, entries(child, path));
+              }
+              return out;
+            };
+
+            let before = {};
+            try {
+              before = entries(JSON.parse(
+                execFileSync('git', ['show', `HEAD~1:${tokenFile}`], {
+                  encoding: 'utf8',
+                  stdio: ['ignore', 'pipe', 'ignore'],
+                })
+              ));
+            } catch {
+              // The hierarchy file is new in this commit.
+            }
+            const after = entries(JSON.parse(fs.readFileSync(tokenFile, 'utf8')));
+
+            const added = Object.keys(after).filter((k) => !(k in before)).sort();
+            const updated = Object.keys(after)
+              .filter((k) => k in before && before[k] !== after[k])
+              .sort();
+            const removed = Object.keys(before).filter((k) => !(k in after)).sort();
+
+            const section = (title, paths) => {
+              if (paths.length === 0) return '';
+              const shown = paths.slice(0, 50).map((p) => `- \`${p}\``);
+              if (paths.length > shown.length) shown.push(`- …and ${paths.length - shown.length} more`);
+              return `### ${title} (${paths.length})\n${shown.join('\n')}\n\n`;
+            };
+
+            const summary = [
+              `**Hierarchy**: \`${hierarchy}\` · **Mode**: \`${process.env.MODE.replace(/[^a-z]/g, '')}\``,
+              '',
+              `${added.length} added, ${updated.length} updated, ${removed.length} removed.`,
+              '',
+              section('Added', added) + section('Updated', updated) + section('Removed', removed),
+            ].join('\n').trim();
+
+            const prBody = [
+              '## Token Import',
+              '',
+              `This PR was automatically generated from issue #${issueNumber}.`,
+              '',
+              '### Description',
+              process.env.DESCRIPTION || 'No description provided.',
+              '',
+              '### Changes',
+              summary,
+              '',
+              '---',
+              '',
+              '**Reviewers**: Please verify the imported tokens before merging. The',
+              'build preview comment below lists every resolved value that changed.',
+              '',
+              `Closes #${issueNumber}.`,
+            ].join('\n');
+
+            const pr = await github.rest.pulls.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: process.env.ISSUE_TITLE,
+              head: process.env.BRANCH_NAME,
+              base: 'main',
+              body: prBody
+            });
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+              body: `✅ Pull request created: #${pr.data.number}\n\nYour token import is ready for review.`
+            });
+
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr.data.number,
+              labels: ['token-change', 'import']
+            });
+
+      - name: Handle no changes
+        if: steps.commit.outputs.changes == 'false'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.ACTIONS_PAT || github.token }}
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: ${{ inputs.issue-number }},
+              body: `⚠️ The import produced no changes. Every token in the document already exists with the same value, type and description.`
+            });

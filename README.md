@@ -70,6 +70,7 @@ npm run build -- --no-references
 
 ```text
 tokens/
+  design-values/tokens.json
   universal/tokens.json
   system/tokens.json
   semantic/tokens.json
@@ -80,24 +81,26 @@ src/
   build-config.ts
   build-tokens.ts
   token-loader.ts
-  token-reference-resolver.ts
   token-validator.ts
 
 tests/
   fixtures/
-    valid/                  # happy-path fixture (all 4 layers)
+    valid/                  # happy-path fixture (all 5 layers)
     invalid-naming/         # breaks Curtis Nathan kebab-case rule
     invalid-hierarchy/      # universal token referencing another layer
     invalid-reference/      # unresolved {path.to.token}
   token-loader.test.ts
   token-validator.test.ts
   token-pipeline.test.ts
+  token-common.test.ts
+  import-tokens.test.ts
 
 .github/scripts/
   token-common.ts
   create-token.ts
   update-token.ts
   delete-token.ts
+  import-tokens.ts
 ```
 
 ## Token Naming — Curtis Nathan convention
@@ -212,5 +215,53 @@ runtime pipeline.
 
 ## Automation
 
-GitHub workflows in `.github/workflows/` support create, update, and delete token requests via issue templates and helper scripts under `.github/scripts/`.
+GitHub workflows in `.github/workflows/` support create, update, delete, and import
+token requests via issue templates and helper scripts under `.github/scripts/`.
+Every request lands as a pull request, never a direct push to `main`. See
+`.github/WORKFLOWS_README.md`.
+
+### Importing a token file
+
+The **📥 Import Tokens** issue template takes a DTCG JSON document, pasted
+into the form, and writes it into one hierarchy:
+
+- **merge** (default) overlays the document. Tokens you do not mention are kept;
+  tokens you do mention are replaced outright, so a stale `$type` or
+  `$description` does not linger.
+- **replace** makes the document the whole file. Anything missing from it is
+  removed, and the import is rejected if another layer still references what
+  would go.
+
+GitHub caps an issue body at 65,536 characters and rejects a longer one on submit.
+The form states the resulting token ceiling for each way of writing them.
+
+The document is taken as DTCG (legacy Style Dictionary `value`/`type` JSON is
+converted to it) and is not otherwise normalized — in particular
+`$type` may sit on a **group** and be inherited by everything below it:
+
+```json
+{
+  "color": {
+    "$type": "color",
+    "green": {
+      "500": { "$value": "oklch(0.72 0.19 149)", "$description": "accent" },
+      "600": { "$value": "oklch(0.62 0.19 149)" }
+    }
+  }
+}
+```
+
+Paths carry no hierarchy prefix, every segment is lowercase `kebab-case`, and a
+layer may reference only itself and layers below it. Malformed paths are all
+reported in one run.
+
+The same import can be run locally — the script takes the JSON itself, so pipe a
+file in if you have one:
+
+```bash
+npx tsx .github/scripts/import-tokens.ts \
+  --hierarchy universal \
+  --mode merge \
+  --json "$(cat ./my-tokens.json)"
+```
 

@@ -1,33 +1,4 @@
-import StyleDictionary, {
-  type Config,
-  type PlatformConfig,
-  type File,
-  type Transform
-} from "style-dictionary";
-
-/**
- * Preserves CSS function values during value transformation.
- *
- * This avoids accidental mutation of literals such as `clamp()` or `calc()`
- * when tokens are serialized for CSS output.
- */
-export const cssFunctionTransform: Transform = {
-  name: "css/function-preserve",
-  type: "value",
-  transitive: true,
-  matcher: (token) => {
-    // Apply to all tokens that might contain CSS functions
-    return typeof token.value === "string" &&
-           (token.value.includes("clamp(") ||
-            token.value.includes("minmax(") ||
-            token.value.includes("calc(") ||
-            token.value.includes("var("));
-  },
-  transformer: (token) => {
-    // Ensure CSS functions are preserved as-is
-    return token.value;
-  }
-};
+import type { Config, DesignTokens, File, PlatformConfig } from "style-dictionary/types";
 
 /**
  * Build toggles and output customization used by the token build pipeline.
@@ -119,7 +90,7 @@ export class BuildConfig {
    * @param tokens Token tree to pass into Style Dictionary.
    * @returns Full Style Dictionary config with enabled platforms.
    */
-  createConfig(tokens: Record<string, unknown>): Config {
+  createConfig(tokens: DesignTokens): Config {
     const platforms: Record<string, PlatformConfig> = {};
 
     if (this.options.generateCss) platforms.css = this.createCssPlatform();

@@ -1,0 +1,129 @@
+name: 📥 Import Tokens
+description: Paste a whole DTCG JSON document to override or add tokens in one hierarchy
+title: "[IMPORT] "
+labels: ["token-request", "import"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Import DTCG Tokens
+
+        **Paste your DTCG JSON** below. It is written into the single
+        `tokens/{hierarchy}/tokens.json` file for the hierarchy you pick, and the
+        result is opened as a pull request.
+
+        The document is taken as-is — nothing is normalized or rewritten. In
+        particular `$type` may sit on a **group** and be inherited by everything
+        below it, which is the DTCG way:
+
+        ```json
+        {
+          "color": {
+            "$type": "color",
+            "green": {
+              "500": { "$value": "oklch(0.72 0.19 149)", "$description": "accent" },
+              "600": { "$value": "oklch(0.62 0.19 149)" }
+            }
+          }
+        }
+        ```
+
+        **Rules** (the same ones every token change obeys)
+
+        - Every path segment is lowercase `kebab-case` — `on-brand`, `primary-text`.
+        - Paths carry **no hierarchy prefix**; the hierarchy is the dropdown below.
+        - Each layer may reference only itself and layers **below** it:
+          `design-values` ← `universal` ← `system` ← `semantic` ← `component`.
+        - A reference is a hierarchy-less path: `{color.blue.500}`.
+
+        Malformed paths are all reported at once, so one run tells you everything
+        that needs fixing.
+
+  - type: dropdown
+    id: hierarchy
+    attributes:
+      label: Hierarchy
+      description: Which layer does this document belong to? One import writes one layer.
+      options:
+        - design-values
+        - universal
+        - system
+        - semantic
+        - component
+    validations:
+      required: true
+
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Mode
+      description: |
+        **merge** — overlay onto the existing file. Tokens you do not mention are kept;
+        tokens you do mention are replaced outright.
+
+        **replace** — the imported document becomes the whole file. Anything missing
+        from it is removed, and the import is rejected if another layer still
+        references what would go.
+      options:
+        - merge
+        - replace
+    validations:
+      required: true
+
+  - type: textarea
+    id: tokens-json
+    attributes:
+      label: DTCG JSON
+      description: |
+        The full document, pasted as-is.
+
+        **Size limit.** GitHub caps an entire issue body at 65,536 characters and
+        rejects anything longer *on submit* — the issue is not created and what
+        you typed is lost, so check before you paste something large. After this
+        form's other fields, about **64,700 characters** are left for the JSON.
+        In practice that is roughly:
+
+        | How the tokens are written                          | Max tokens |
+        | --------------------------------------------------- | ---------- |
+        | group `$type`, short names, no `$description`        | ~1,380     |
+        | leaf `$type`, nested paths, no `$description`        | ~580       |
+        | leaf `$type` + `$description` + a `{reference}`      | ~355       |
+        | long paths, long descriptions, `$extensions`         | ~150       |
+
+        Minifying (no indentation) roughly doubles each figure. For scale, this
+        repository's whole token set is 87 tokens.
+      render: json
+      placeholder: |
+        {
+          "color": {
+            "$type": "color",
+            "green": { "500": { "$value": "oklch(0.72 0.19 149)" } }
+          }
+        }
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: Where does this document come from, and why is it being imported?
+      placeholder: "Refreshed green ramp exported from the brand palette review."
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: confirmation
+    attributes:
+      label: Pre-submission Checklist
+      options:
+        - label: The JSON is DTCG-conform and parses.
+          required: true
+        - label: All path segments are lowercase `kebab-case`, with no hierarchy prefix.
+          required: true
+        - label: Every `$value` reference points at this layer or one **below** it.
+          required: true
+        - label: Every token has a `$type`, on the token or on an ancestor group.
+          required: true
+        - label: I understand `replace` removes any token missing from this document.
+          required: true

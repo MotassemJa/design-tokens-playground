@@ -1,16 +1,6 @@
-import { type Hierarchy } from "./token-loader.js";
-
-export interface DesignTokenValue {
-  $value: unknown;
-  $type?: string;
-  $description?: string;
-  $extensions?: Record<string, unknown>;
-  $deprecated?: boolean | string;
-}
-
-export interface TokenGroup {
-  [key: string]: DesignTokenValue | TokenGroup;
-}
+import type { DesignToken, DesignTokens, TransformedToken } from "style-dictionary/types";
+import { getReferences, usesReferences } from "style-dictionary/utils";
+import { toTokenMap, type Hierarchy } from "./token-loader.js";
 
 /** Kebab-case segment: lowercase letters/digits, optional `-` between runs. */
 const SEGMENT_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
@@ -23,7 +13,21 @@ const HIERARCHY_ALLOWED_REFS: Record<Hierarchy, readonly Hierarchy[]> = {
   component: ["design-values", "universal", "system", "semantic", "component"],
 };
 
-const REFERENCE_PATTERN = /\{([^}]+)\}/g;
+/** DTCG metadata keys (`$type`, `$description`, …) are never path segments. */
+export function isDtcgMetadataKey(key: string): boolean {
+  return key.startsWith("$");
+}
+
+/** One error per segment of `path` that is not kebab-case. */
+function segmentErrors(path: string): string[] {
+  return path
+    .split(".")
+    .filter((segment) => !SEGMENT_PATTERN.test(segment))
+    .map(
+      (segment) =>
+        `Segment '${segment}' in path '${path}' is not kebab-case (lowercase letters, digits, '-' only).`
+    );
+}
 
 /**
  * Enforces:
@@ -36,8 +40,9 @@ const REFERENCE_PATTERN = /\{([^}]+)\}/g;
  *     semantic → design-values/universal/system/semantic,
  *     component → design-values/universal/system/semantic/component.
  *
- * DTCG value-shape validation is delegated to TokenScript in the build
- * pipeline (`processTokens`).
+ * Tokens are walked as Style Dictionary token maps, so `$type` inheritance and
+ * reference lookup are SD's own. DTCG value-shape validation is delegated to
+ * TokenScript in the build pipeline (`processTokens`).
  */
 export class TokenValidator {
   private errors: string[] = [];
@@ -47,18 +52,26 @@ export class TokenValidator {
    * Validates tokens grouped by hierarchy.
    * Hierarchy is the folder the token file lives in — not part of the token path.
    */
-  validate(tokensByHierarchy: Map<Hierarchy, TokenGroup>): boolean {
+  validate(tokensByHierarchy: Map<Hierarchy, DesignTokens>): boolean {
     this.errors = [];
     this.warnings = [];
 
-    // Build a lookup: every leaf token path → its source hierarchy.
-    const pathToHierarchy = new Map<string, Hierarchy>();
-    for (const [hierarchy, tokens] of tokensByHierarchy) {
-      this.collectPaths(tokens, [], hierarchy, pathToHierarchy);
+    const layers = [...tokensByHierarchy].map(([hierarchy, tree]) => [hierarchy, toTokenMap(tree)] as const);
+
+    // Every token across all layers, and the layer each one came from.
+    const allTokens = new Map<string, DesignToken>();
+    const hierarchyOf = new Map<string, Hierarchy>();
+    for (const [hierarchy, tokenMap] of layers) {
+      for (const [key, token] of tokenMap) {
+        allTokens.set(key, token);
+        hierarchyOf.set(key, hierarchy);
+      }
     }
 
-    for (const [hierarchy, tokens] of tokensByHierarchy) {
-      this.walk(tokens, [], hierarchy, pathToHierarchy);
+    for (const [hierarchy, tokenMap] of layers) {
+      for (const [key, token] of tokenMap) {
+        this.validateToken(key.slice(1, -1), token, hierarchy, allTokens, hierarchyOf);
+      }
     }
 
     return this.errors.length === 0;
@@ -74,151 +87,65 @@ export class TokenValidator {
 
   /** Validates a fully-qualified dotted token path (kebab-case segments only). */
   static validatePath(path: string): string[] {
-    const errors: string[] = [];
-    if (!path) {
-      errors.push("Token path is empty.");
-      return errors;
-    }
+    if (!path) return ["Token path is empty."];
 
-    const segments = path.split(".");
-    if (segments.length < 2) {
+    const errors: string[] = [];
+    if (path.split(".").length < 2) {
       errors.push(
         `Token path '${path}' must contain at least two segments (e.g. 'color.blue.500').`
       );
     }
-
-    for (const segment of segments) {
-      if (!SEGMENT_PATTERN.test(segment)) {
-        errors.push(
-          `Segment '${segment}' in path '${path}' is not kebab-case (lowercase letters, digits, '-' only).`
-        );
-      }
-    }
-
-    return errors;
+    return [...errors, ...segmentErrors(path)];
   }
 
-  /** Recursively records all leaf token paths into `out`. */
-  private collectPaths(
-    node: TokenGroup | DesignTokenValue,
-    path: string[],
+  private validateToken(
+    path: string,
+    token: DesignToken,
     hierarchy: Hierarchy,
-    out: Map<string, Hierarchy>
+    allTokens: Map<string, DesignToken>,
+    hierarchyOf: Map<string, Hierarchy>
   ): void {
-    if (!node || typeof node !== "object") return;
-    if (this.isTokenLeaf(node)) {
-      out.set(path.join("."), hierarchy);
-      return;
-    }
-    for (const [key, child] of Object.entries(node)) {
-      this.collectPaths(child as TokenGroup, [...path, key], hierarchy, out);
-    }
-  }
+    this.errors.push(...segmentErrors(path));
 
-  private walk(
-    node: TokenGroup | DesignTokenValue,
-    path: string[],
-    hierarchy: Hierarchy,
-    pathToHierarchy: Map<string, Hierarchy>
-  ): void {
-    if (!node || typeof node !== "object") return;
-
-    if (this.isTokenLeaf(node)) {
-      this.validateLeaf(node as DesignTokenValue, path, hierarchy, pathToHierarchy);
-      return;
-    }
-
-    for (const [key, child] of Object.entries(node)) {
-      const childPath = [...path, key];
-
-      if (!SEGMENT_PATTERN.test(key)) {
-        this.errors.push(
-          `Segment '${key}' (at '${childPath.join(".")}') is not kebab-case (lowercase letters, digits, '-').`
-        );
-      }
-
-      this.walk(child as TokenGroup, childPath, hierarchy, pathToHierarchy);
-    }
-  }
-
-  private isTokenLeaf(value: unknown): value is DesignTokenValue {
-    return (
-      typeof value === "object" &&
-      value !== null &&
-      "$value" in (value as Record<string, unknown>)
-    );
-  }
-
-  private validateLeaf(
-    token: DesignTokenValue,
-    path: string[],
-    hierarchy: Hierarchy,
-    pathToHierarchy: Map<string, Hierarchy>
-  ): void {
-    const pathStr = path.join(".");
-
-    if (!("$value" in token)) {
-      this.errors.push(`Token '${pathStr}' is missing required $value.`);
-    }
+    // typeDtcgDelegate already copied any ancestor group's $type onto the token.
     if (!token.$type) {
-      this.errors.push(`Token '${pathStr}' is missing required $type.`);
+      this.errors.push(
+        `Token '${path}' is missing required $type (not set on the token or any ancestor group).`
+      );
     }
     if (token.$description !== undefined && typeof token.$description !== "string") {
-      this.errors.push(`Token '${pathStr}': $description must be a string.`);
+      this.errors.push(`Token '${path}': $description must be a string.`);
     }
     if (
       token.$extensions !== undefined &&
       (typeof token.$extensions !== "object" || token.$extensions === null)
     ) {
-      this.errors.push(`Token '${pathStr}': $extensions must be an object.`);
+      this.errors.push(`Token '${path}': $extensions must be an object.`);
     }
 
-    this.validateReferences(token.$value, pathStr, hierarchy, pathToHierarchy);
-  }
+    if (!usesReferences(token.$value)) return;
 
-  private validateReferences(
-    value: unknown,
-    tokenPath: string,
-    tokenLayer: Hierarchy,
-    pathToHierarchy: Map<string, Hierarchy>
-  ): void {
-    if (typeof value !== "string") {
-      if (value && typeof value === "object") {
-        for (const inner of Object.values(value as Record<string, unknown>)) {
-          this.validateReferences(inner, tokenPath, tokenLayer, pathToHierarchy);
-        }
-      }
+    let references: TransformedToken[];
+    try {
+      references = getReferences(token.$value, allTokens as Map<string, TransformedToken>, {
+        usesDtcg: true,
+      });
+    } catch (error) {
+      // SD throws on the first reference it cannot find.
+      this.errors.push(`Token '${path}': ${error instanceof Error ? error.message : String(error)}`);
       return;
     }
 
-    let match: RegExpExecArray | null;
-    REFERENCE_PATTERN.lastIndex = 0;
-    while ((match = REFERENCE_PATTERN.exec(value)) !== null) {
-      const refPath = match[1];
-
-      const nameErrors = TokenValidator.validatePath(refPath);
-      for (const msg of nameErrors) {
-        this.errors.push(`Token '${tokenPath}' references '${refPath}': ${msg}`);
-      }
-      if (nameErrors.length > 0) continue;
-
-      const refHierarchy = pathToHierarchy.get(refPath);
-      if (refHierarchy === undefined) {
-        this.errors.push(
-          `Token '${tokenPath}' references '${refPath}' which does not exist in any hierarchy.`
-        );
-        continue;
-      }
-
-      const allowed = HIERARCHY_ALLOWED_REFS[tokenLayer] ?? [];
+    const allowed = HIERARCHY_ALLOWED_REFS[hierarchy];
+    for (const reference of references) {
+      // getReferences tags each match with the path it was found at.
+      const refPath = (reference.ref as string[]).join(".");
+      const refHierarchy = hierarchyOf.get(`{${refPath}}`)!;
       if (!allowed.includes(refHierarchy)) {
-        const allowedStr =
-          allowed.length > 0 ? allowed.join(", ") : "no other layers (self-contained)";
         this.errors.push(
-          `Hierarchy violation: '${tokenLayer}' token '${tokenPath}' cannot reference '${refHierarchy}' token '${refPath}'. Allowed: ${allowedStr}.`
+          `Hierarchy violation: '${hierarchy}' token '${path}' cannot reference '${refHierarchy}' token '${refPath}'. Allowed: ${allowed.join(", ")}.`
         );
       }
     }
   }
 }
-

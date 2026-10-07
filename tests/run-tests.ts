@@ -13,7 +13,8 @@ import { readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { builders, processTokens } from "@tokens-studio/tokenscript-interpreter";
 import { TokenLoader, type Hierarchy } from "../src/token-loader.js";
-import { TokenValidator, type TokenGroup } from "../src/token-validator.js";
+import type { DesignTokens } from "style-dictionary/types";
+import { TokenValidator } from "../src/token-validator.js";
 
 const FIXTURES_DIR = join(process.cwd(), "tests", "fixtures");
 
@@ -37,7 +38,7 @@ function runFixture(fixtureName: string): TestResult {
     const tokens = loader.loadTokens();
 
     const validator = new TokenValidator();
-    if (!validator.validate(tokensByHierarchy as Map<Hierarchy, TokenGroup>)) {
+    if (!validator.validate(tokensByHierarchy)) {
       actual = "fail";
       details.push(...validator.getErrors().map((e) => `[validator] ${e}`));
     }

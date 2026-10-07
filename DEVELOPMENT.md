@@ -27,9 +27,8 @@ Edit files in `tokens/`, refresh preview, and inspect generated artifacts in `di
 1. `src/token-loader.ts` loads `tokens/{universal,system,semantic,component}/tokens.json` (only that exact layout is accepted).
 2. `src/token-validator.ts` validates Curtis Nathan naming + layer-reference rules. Value validation is delegated to TokenScript.
 3. `src/build-tokens.ts` runs `@tokens-studio/tokenscript-interpreter` for interpretation and value validation.
-4. `src/token-reference-resolver.ts` resolves references for resolved output.
-5. `src/build-config.ts` defines Style Dictionary platforms.
-6. Style Dictionary writes CSS/JS/types outputs.
+4. `src/build-config.ts` defines Style Dictionary platforms.
+5. Style Dictionary writes CSS/JS/types outputs, and resolves references for the resolved JSON output.
 
 ## Token Layer Rules
 

@@ -1,5 +1,6 @@
 import type { Hierarchy } from "../src/token-loader.js";
-import { TokenValidator, type TokenGroup } from "../src/token-validator.js";
+import type { DesignTokens } from "style-dictionary/types";
+import { TokenValidator } from "../src/token-validator.js";
 import { loadFixtureTokensByHierarchy, validateFixture } from "./test-helpers.js";
 
 describe("TokenValidator.validatePath", () => {
@@ -50,13 +51,13 @@ describe("TokenValidator", () => {
 
     expect(validator.getErrors()).toEqual(
       expect.arrayContaining([
-        expect.stringContaining("references 'does.not.exist' which does not exist in any hierarchy"),
+        expect.stringContaining("Tries to reference does.not.exist, which is not defined."),
       ])
     );
   });
 
-  it("requires $type on token leaves", () => {
-    const tokensByHierarchy = new Map<Hierarchy, TokenGroup>([
+  it("requires $type on a token with no ancestor group $type", () => {
+    const tokensByHierarchy = new Map<Hierarchy, DesignTokens>([
       [
         "universal",
         {
@@ -73,7 +74,95 @@ describe("TokenValidator", () => {
     const validator = new TokenValidator();
 
     expect(validator.validate(tokensByHierarchy)).toBe(false);
-    expect(validator.getErrors()).toContain("Token 'color.blue.500' is missing required $type.");
+    expect(validator.getErrors()).toContain(
+      "Token 'color.blue.500' is missing required $type (not set on the token or any ancestor group)."
+    );
+  });
+
+  it("inherits $type from an ancestor group (DTCG)", () => {
+    const tokensByHierarchy = new Map<Hierarchy, DesignTokens>([
+      [
+        "universal",
+        {
+          color: {
+            $type: "color",
+            blue: {
+              500: { $value: "#3B82F6" },
+            },
+            green: {
+              500: { $value: "#22C55E", $description: "deep in a nested group" },
+            },
+          },
+        },
+      ],
+    ]);
+    const validator = new TokenValidator();
+
+    expect(validator.validate(tokensByHierarchy)).toBe(true);
+    expect(validator.getErrors()).toEqual([]);
+  });
+
+  it("does not treat DTCG metadata keys as path segments", () => {
+    const tokensByHierarchy = new Map<Hierarchy, DesignTokens>([
+      [
+        "universal",
+        {
+          color: {
+            $type: "color",
+            $description: "group metadata, not a token",
+            blue: { $value: "#3B82F6" },
+          },
+        },
+      ],
+    ]);
+    const validator = new TokenValidator();
+
+    expect(validator.validate(tokensByHierarchy)).toBe(true);
+    expect(validator.getErrors()).toEqual([]);
+  });
+
+  it("lets a token's own $type win over the group's", () => {
+    const tokensByHierarchy = new Map<Hierarchy, DesignTokens>([
+      [
+        "universal",
+        {
+          scale: {
+            $type: "dimension",
+            ratio: { $value: 1.5, $type: "number" },
+          },
+        },
+      ],
+    ]);
+    const validator = new TokenValidator();
+
+    expect(validator.validate(tokensByHierarchy)).toBe(true);
+  });
+
+  it("resolves references declared inside a group-typed tree", () => {
+    const tokensByHierarchy = new Map<Hierarchy, DesignTokens>([
+      [
+        "universal",
+        {
+          color: {
+            $type: "color",
+            blue: { $value: "#3B82F6" },
+          },
+        },
+      ],
+      [
+        "system",
+        {
+          brand: {
+            $type: "color",
+            primary: { $value: "{color.blue}" },
+          },
+        },
+      ],
+    ]);
+    const validator = new TokenValidator();
+
+    expect(validator.validate(tokensByHierarchy)).toBe(true);
+    expect(validator.getErrors()).toEqual([]);
   });
 
   it("validates fixture references against discovered token paths", () => {
@@ -84,7 +173,7 @@ describe("TokenValidator", () => {
   });
 
   it("allows references within the same hierarchy", () => {
-    const tokensByHierarchy = new Map<Hierarchy, TokenGroup>([
+    const tokensByHierarchy = new Map<Hierarchy, DesignTokens>([
       [
         "system",
         {

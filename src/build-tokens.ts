@@ -1,20 +1,17 @@
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import StyleDictionary from "style-dictionary";
+import type { DesignTokens } from "style-dictionary/types";
+import { stripMeta } from "style-dictionary/utils";
 import { builders, processTokens } from "@tokens-studio/tokenscript-interpreter";
-import { TokenLoader, type Hierarchy } from "./token-loader.js";
-import { TokenReferenceResolver } from "./token-reference-resolver.js";
-import { TokenValidator, type TokenGroup } from "./token-validator.js";
+import { fromTokenMap, TokenLoader, toTokenMap } from "./token-loader.js";
+import { TokenValidator } from "./token-validator.js";
 import { BuildConfig, type BuildOptions } from "./build-config.js";
 
-const tokenLoader = new TokenLoader();
+/** The DTCG properties kept on each token in the resolved JSON export. */
+const DTCG_PROPS = ["$value", "$type", "$description", "$extensions", "$deprecated"];
 
-/**
- * Creates a JSON-safe deep clone for token trees.
- */
-function deepClone<T>(value: T): T {
-  return JSON.parse(JSON.stringify(value)) as T;
-}
+const tokenLoader = new TokenLoader();
 
 /**
  * Normalizes unknown runtime output into an object map.
@@ -73,43 +70,30 @@ function setNestedValue(target: Record<string, unknown>, path: string[], nextVal
 /**
  * Applies interpreted token values onto `$value` properties in a token tree.
  *
- * Token paths that cannot be resolved in the current tree are skipped.
+ * Token paths that are not in the tree are skipped.
  */
 function applyInterpretedValues(
-  tokens: Record<string, unknown>,
+  tokens: DesignTokens,
   flatInterpretedValues: Record<string, unknown>
-): Record<string, unknown> {
-  const cloned = deepClone(tokens);
+): DesignTokens {
+  const tokenMap = toTokenMap(tokens);
 
   for (const [tokenPath, resolvedValue] of Object.entries(flatInterpretedValues)) {
-    const pathParts = tokenPath.split(".");
-    let current: unknown = cloned;
-
-    for (const part of pathParts) {
-      if (!current || typeof current !== "object" || !(part in (current as Record<string, unknown>))) {
-        current = null;
-        break;
-      }
-
-      current = (current as Record<string, unknown>)[part];
-    }
-
-    if (current && typeof current === "object" && "$value" in (current as Record<string, unknown>)) {
-      (current as { $value: unknown }).$value = resolvedValue;
-    }
+    const token = tokenMap.get(`{${tokenPath}}`);
+    if (token) token.$value = resolvedValue;
   }
 
-  return cloned;
+  return fromTokenMap(tokenMap);
 }
 
 /**
  * Builds a flattened interpreted JSON output used by `tokens.interpreted.json`.
  */
 function buildInterpretedJson(
-  interpretedTokenTree: Record<string, unknown>,
+  interpretedTokenTree: DesignTokens,
   flatInterpretedValues: Record<string, unknown>
 ): Record<string, unknown> {
-  const result = deepClone(interpretedTokenTree);
+  const result = structuredClone(interpretedTokenTree) as Record<string, unknown>;
 
   for (const [tokenPath, resolvedValue] of Object.entries(flatInterpretedValues)) {
     setNestedValue(result, tokenPath.split("."), resolvedValue);
@@ -179,7 +163,7 @@ export async function buildTokens(options: BuildOptions = {}) {
   const allTokens = tokenLoader.loadTokens();
   const validator = new TokenValidator();
 
-  if (!validator.validate(tokensByHierarchy as Map<Hierarchy, TokenGroup>)) {
+  if (!validator.validate(tokensByHierarchy)) {
     const errors = validator.getErrors().map((error) => `- ${error}`).join("\n");
     throw new Error(`Token validation failed:\n${errors}`);
   }
@@ -221,7 +205,13 @@ export async function buildTokens(options: BuildOptions = {}) {
   if (generateJson) {
     console.log("📄 Generating enhanced JSON export...");
 
-    const resolvedTokens = new TokenReferenceResolver().resolveReferences(interpretedTokens);
+    // A platform with no transforms: exporting it resolves every reference and
+    // leaves values otherwise untouched.
+    const resolver = new StyleDictionary({ tokens: interpretedTokens, platforms: { resolved: {} } });
+    const resolvedTokens = stripMeta(await resolver.exportPlatform("resolved"), {
+      usesDtcg: true,
+      keep: DTCG_PROPS,
+    });
     const interpretedOutput = buildInterpretedJson(interpretedTokens, flatInterpretedValues);
 
     writeFileSync(join(process.cwd(), outputDir, "tokens.json"), JSON.stringify(allTokens, null, 2));

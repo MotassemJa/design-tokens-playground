@@ -1,22 +1,15 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import type { DesignToken, DesignTokens } from "style-dictionary/types";
+import { convertToDTCG, flattenTokens } from "style-dictionary/utils";
 import {
   ALLOWED_HIERARCHIES,
   TOKEN_FILENAME,
   TOKENS_ROOT,
+  TokenLoader,
   type Hierarchy,
-} from "../../src/token-loader.ts";
-import { TokenValidator, type TokenGroup } from "../../src/token-validator.ts";
-
-export interface TokenLeaf {
-  $value: unknown;
-  $type?: string;
-  $description?: string;
-}
-
-export interface TokenTree {
-  [key: string]: TokenLeaf | TokenTree;
-}
+} from "../../src/token-loader";
+import { TokenValidator, isDtcgMetadataKey } from "../../src/token-validator";
 
 /**
  * Input payload from issue-form / CLI.
@@ -45,23 +38,88 @@ export function buildTokenPath(data: TokenData): string {
   return parts.join(".");
 }
 
+/** Reports a fatal error and exits. Typed `never` so callers narrow correctly. */
+function fail(message: string): never {
+  console.error(message);
+  process.exit(1);
+}
+
+/** {@link fail} for a headline plus one indented line per problem. */
+function failWithList(headline: string, problems: string[]): never {
+  return fail([headline, ...problems.map((p) => `  - ${p}`)].join("\n"));
+}
+
 /**
- * Returns the validated hierarchy for a TokenData payload.
+ * Reads a single value out of an issue-form dropdown.
+ *
+ * `issue-ops/parser` emits a dropdown as a JSON array (`["universal"]`), and
+ * older forms of it as a bare bracketed value (`[universal]`). Both shapes, and
+ * a plain string, normalize to the lowercase option text.
  */
-export function getHierarchy(data: TokenData): Hierarchy {
-  const rawHierarchy = String(data.hierarchy ?? "").trim();
-  const normalizedHierarchy = rawHierarchy
+export function parseDropdownValue(raw: unknown): string {
+  const text = String(raw ?? "").trim();
+  if (!text.startsWith("[")) return text.toLowerCase();
+
+  try {
+    const parsed = JSON.parse(text);
+    if (Array.isArray(parsed)) {
+      return String(parsed[0] ?? "")
+        .trim()
+        .toLowerCase();
+    }
+  } catch {
+    // Not JSON — fall through and treat it as the bare `[universal]` form.
+  }
+
+  return text
     .replace(/^\[+/, "")
     .replace(/\]+$/, "")
     .trim()
-    .toLowerCase() as Hierarchy;
+    .toLowerCase();
+}
 
-  if (!ALLOWED_HIERARCHIES.includes(normalizedHierarchy)) {
+/**
+ * Validates a raw hierarchy at the process boundary, so everything behind it
+ * holds a real {@link Hierarchy} rather than whatever the form produced.
+ */
+export function parseHierarchy(raw: unknown): Hierarchy {
+  const value = parseDropdownValue(raw) as Hierarchy;
+  if (!ALLOWED_HIERARCHIES.includes(value)) {
     throw new Error(
-      `Invalid hierarchy '${rawHierarchy}'. Allowed: ${ALLOWED_HIERARCHIES.join(", ")}`
+      `Invalid hierarchy '${String(raw)}'. Allowed: ${ALLOWED_HIERARCHIES.join(", ")}`,
     );
   }
-  return normalizedHierarchy;
+  return value;
+}
+
+/**
+ * Runs a boundary parser, turning the error it throws into the same `❌ …` and
+ * exit code every other failure in these scripts uses. The parsers throw rather
+ * than exit so they stay ordinary functions; the CLI wrapper is where a process
+ * is allowed to end.
+ */
+export function exitOnError<T>(run: () => T): T {
+  try {
+    return run();
+  } catch (error) {
+    return fail(`❌ ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+/** The modes an import can run in. */
+export const IMPORT_MODES = ["merge", "replace"] as const;
+
+export type ImportMode = (typeof IMPORT_MODES)[number];
+
+/** Validates a raw import mode at the process boundary. */
+export function parseImportMode(raw: unknown): ImportMode {
+  const value = parseDropdownValue(raw) as ImportMode;
+  if (!IMPORT_MODES.includes(value)) {
+    throw new Error(
+      `Invalid mode '${String(raw)}'. Allowed: ${IMPORT_MODES.join(", ")}`,
+    );
+  }
+  return value;
 }
 
 /**
@@ -75,19 +133,19 @@ export function getTokenFilePath(hierarchy: Hierarchy): string {
   return join(dir, TOKEN_FILENAME);
 }
 
-export function readTokenFile(filePath: string): TokenTree {
+export function readTokenFile(filePath: string): DesignTokens {
   if (!existsSync(filePath)) return {};
-  return JSON.parse(readFileSync(filePath, "utf8")) as TokenTree;
+  return JSON.parse(readFileSync(filePath, "utf8")) as DesignTokens;
 }
 
-export function writeTokenFile(filePath: string, data: TokenTree): void {
+export function writeTokenFile(filePath: string, data: DesignTokens): void {
   writeFileSync(filePath, JSON.stringify(data, null, 2) + "\n");
 }
 
 /**
  * Parses a raw value into a DTCG leaf (JSON object or string).
  */
-export function parseTokenValue(value: string): TokenLeaf {
+export function parseTokenValue(value: string): DesignToken {
   try {
     const parsed = JSON.parse(value);
     return { $value: parsed };
@@ -96,12 +154,17 @@ export function parseTokenValue(value: string): TokenLeaf {
   }
 }
 
-export function getNested(tree: TokenTree, tokenPath: string): TokenLeaf | TokenTree | undefined {
+export function getNested(
+  tree: DesignTokens,
+  tokenPath: string,
+): DesignToken | DesignTokens | undefined {
   const parts = tokenPath.split(".");
-  let current: TokenLeaf | TokenTree | undefined = tree;
+  let current: DesignToken | DesignTokens | undefined = tree;
   for (const p of parts) {
     if (current && typeof current === "object" && p in current) {
-      current = (current as TokenTree)[p];
+      // A path segment is never a DTCG metadata key: `$type` is not kebab-case,
+      // so assertValidPath rejects it long before we walk it.
+      current = (current as DesignTokens)[p] as DesignToken | DesignTokens | undefined;
     } else {
       return undefined;
     }
@@ -109,27 +172,31 @@ export function getNested(tree: TokenTree, tokenPath: string): TokenLeaf | Token
   return current;
 }
 
-export function setNested(tree: TokenTree, tokenPath: string, value: TokenLeaf): void {
+export function setNested(
+  tree: DesignTokens,
+  tokenPath: string,
+  value: DesignToken,
+): void {
   const parts = tokenPath.split(".");
-  let cursor: TokenTree = tree;
+  let cursor: DesignTokens = tree;
   for (let i = 0; i < parts.length - 1; i++) {
     const key = parts[i];
     const next = cursor[key];
     if (!next || typeof next !== "object" || "$value" in next) {
       cursor[key] = {};
     }
-    cursor = cursor[key] as TokenTree;
+    cursor = cursor[key] as DesignTokens;
   }
   cursor[parts[parts.length - 1]] = value;
 }
 
-export function deleteNested(tree: TokenTree, tokenPath: string): boolean {
+export function deleteNested(tree: DesignTokens, tokenPath: string): boolean {
   const parts = tokenPath.split(".");
-  let cursor: TokenTree = tree;
+  let cursor: DesignTokens = tree;
   for (let i = 0; i < parts.length - 1; i++) {
     const key = parts[i];
     if (!cursor[key] || typeof cursor[key] !== "object") return false;
-    cursor = cursor[key] as TokenTree;
+    cursor = cursor[key] as DesignTokens;
   }
   const last = parts[parts.length - 1];
   if (last in cursor) {
@@ -139,12 +206,17 @@ export function deleteNested(tree: TokenTree, tokenPath: string): boolean {
   return false;
 }
 
-export function cleanEmptyParents(tree: TokenTree, tokenPath: string): void {
+export function cleanEmptyParents(tree: DesignTokens, tokenPath: string): void {
   const parts = tokenPath.split(".");
   for (let i = parts.length - 1; i > 0; i--) {
     const parentPath = parts.slice(0, i).join(".");
     const parent = getNested(tree, parentPath);
-    if (parent && typeof parent === "object" && !("$value" in parent) && Object.keys(parent).length === 0) {
+    if (
+      parent &&
+      typeof parent === "object" &&
+      !("$value" in parent) &&
+      Object.keys(parent).length === 0
+    ) {
       deleteNested(tree, parentPath);
     } else {
       break;
@@ -153,28 +225,31 @@ export function cleanEmptyParents(tree: TokenTree, tokenPath: string): void {
 }
 
 /**
- * Validates a path against the Curtis Nathan convention. Exits on failure.
+ * Validates paths against the Curtis Nathan convention. Exits on failure,
+ * reporting every offending path — an import of 200 tokens should not need 200
+ * round-trips to surface 200 naming errors.
  */
-function assertValidPath(tokenPath: string): void {
-  const errors = TokenValidator.validatePath(tokenPath);
+export function assertValidPaths(tokenPaths: string[]): void {
+  const errors = tokenPaths.flatMap((p) => TokenValidator.validatePath(p));
   if (errors.length > 0) {
-    console.error("❌ Invalid token path (Curtis Nathan naming convention):");
-    errors.forEach((e) => console.error(`  - ${e}`));
-    process.exit(1);
+    failWithList("❌ Invalid token path (Curtis Nathan naming convention):", errors);
   }
 }
 
 /**
- * Validates full token tree after an operation. Exits on failure.
- * Wraps the single-hierarchy tree into the Map form expected by TokenValidator.
+ * Validates the token tree after an operation. Exits on failure.
+ *
+ * Loads every hierarchy and overlays the modified tree for the one being
+ * written. Validating the single tree in isolation is not enough: references
+ * carry no hierarchy prefix, so any cross-layer `{ref}` would be reported as
+ * missing and every operation outside `design-values` would fail.
  */
-function assertTreeValid(tree: TokenTree, hierarchy: Hierarchy): void {
+export function assertTreeValid(tree: DesignTokens, hierarchy: Hierarchy): void {
   const validator = new TokenValidator();
-  const byHierarchy = new Map([[hierarchy, tree as TokenGroup]]);
+  const byHierarchy = new TokenLoader().loadTokensByHierarchy();
+  byHierarchy.set(hierarchy, tree);
   if (!validator.validate(byHierarchy)) {
-    console.error("❌ Token validation failed:");
-    validator.getErrors().forEach((e) => console.error(`  - ${e}`));
-    process.exit(1);
+    failWithList("❌ Token validation failed:", validator.getErrors());
   }
   validator.getWarnings().forEach((w) => console.warn(`⚠️  ${w}`));
 }
@@ -184,18 +259,21 @@ function assertTreeValid(tree: TokenTree, hierarchy: Hierarchy): void {
  */
 export function createToken(data: TokenData): void {
   const tokenPath = buildTokenPath(data);
-  assertValidPath(tokenPath);
+  assertValidPaths([tokenPath]);
 
-  const hierarchy = getHierarchy(data);
+  const hierarchy = data.hierarchy;
   const filePath = getTokenFilePath(hierarchy);
   const tree = readTokenFile(filePath);
 
   if (getNested(tree, tokenPath)) {
-    console.log(`Token already exists at path: ${tokenPath}. Use the update action instead.`);
+    console.log(
+      `Token already exists at path: ${tokenPath}. Use the update action instead.`,
+    );
     process.exit(0);
   }
 
   const leaf = parseTokenValue(data.value ?? "");
+  console.log(JSON.stringify(leaf, null, 2));
   if (data.tokenType) leaf.$type = data.tokenType;
   if (data.description) leaf.$description = data.description;
 
@@ -211,21 +289,26 @@ export function createToken(data: TokenData): void {
  */
 export function updateToken(data: TokenData): void {
   const tokenPath = buildTokenPath(data);
-  assertValidPath(tokenPath);
+  assertValidPaths([tokenPath]);
 
-  const hierarchy = getHierarchy(data);
+  const hierarchy = data.hierarchy;
   const filePath = getTokenFilePath(hierarchy);
   const tree = readTokenFile(filePath);
 
   const existing = getNested(tree, tokenPath);
   if (!existing || typeof existing !== "object" || !("$value" in existing)) {
-    console.error(`Token not found at path: ${tokenPath}`);
-    process.exit(1);
+    fail(`❌ Token not found at path: ${tokenPath}`);
   }
 
-  const leaf = parseTokenValue(data.value ?? "");
-  leaf.$type = data.tokenType ?? (existing as TokenLeaf).$type;
-  leaf.$description = data.description ?? (existing as TokenLeaf).$description;
+  // Spread the existing leaf first: an update manages $value, $type and
+  // $description, and must not drop $extensions, $deprecated or anything else
+  // the token already carries.
+  const leaf: DesignToken = {
+    ...(existing as DesignToken),
+    ...parseTokenValue(data.value ?? ""),
+  };
+  if (data.tokenType) leaf.$type = data.tokenType;
+  if (data.description) leaf.$description = data.description;
 
   setNested(tree, tokenPath, leaf);
   assertTreeValid(tree, hierarchy);
@@ -239,20 +322,117 @@ export function updateToken(data: TokenData): void {
  */
 export function deleteToken(data: TokenData): void {
   const tokenPath = buildTokenPath(data);
-  assertValidPath(tokenPath);
+  assertValidPaths([tokenPath]);
 
-  const hierarchy = getHierarchy(data);
+  const hierarchy = data.hierarchy;
   const filePath = getTokenFilePath(hierarchy);
   const tree = readTokenFile(filePath);
 
   if (!getNested(tree, tokenPath)) {
-    console.error(`Token not found at path: ${tokenPath}`);
-    process.exit(1);
+    fail(`❌ Token not found at path: ${tokenPath}`);
   }
 
   deleteNested(tree, tokenPath);
   cleanEmptyParents(tree, tokenPath);
+  // Deleting a token another layer still references would ship a tree that
+  // cannot build, so the delete is validated like any other write.
+  assertTreeValid(tree, hierarchy);
   writeTokenFile(filePath, tree);
 
   console.log(`🗑️  Deleted token: ${tokenPath}`);
+}
+
+/**
+ * Input payload for an import request.
+ */
+export interface ImportData {
+  hierarchy: Hierarchy;
+  mode: ImportMode;
+  /** The DTCG JSON document itself, as text. */
+  json: string;
+}
+
+function isLeaf(node: unknown): boolean {
+  return (
+    !!node &&
+    typeof node === "object" &&
+    "$value" in (node as Record<string, unknown>)
+  );
+}
+
+/**
+ * Deep-merges `incoming` onto `target`, stopping at token leaves.
+ *
+ * A node carrying `$value` is replaced wholesale, never merged key by key:
+ * recursing into it would strand the previous `$type` / `$description` when the
+ * incoming document types the group instead of the leaf, which is exactly the
+ * stale metadata an override is meant to clear.
+ */
+export function mergeTokenTrees(
+  target: DesignTokens,
+  incoming: DesignTokens,
+): DesignTokens {
+  for (const [key, value] of Object.entries(incoming)) {
+    if (isDtcgMetadataKey(key) || isLeaf(value)) {
+      target[key] = value;
+      continue;
+    }
+
+    const existing = target[key];
+    if (!existing || typeof existing !== "object" || isLeaf(existing)) {
+      target[key] = {};
+    }
+    mergeTokenTrees(target[key] as DesignTokens, value as DesignTokens);
+  }
+
+  return target;
+}
+
+/**
+ * Imports a DTCG JSON document into one hierarchy.
+ *
+ * The document is DTCG, or legacy Style Dictionary JSON converted to it. It is
+ * not otherwise normalized: `$type` stays on whichever group or token declared
+ * it, and the validator resolves inheritance.
+ */
+export function importTokens(data: ImportData): void {
+  const hierarchy = data.hierarchy;
+
+  if (data.json.trim().length === 0) {
+    fail("❌ The DTCG JSON was empty.");
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(data.json);
+  } catch (error) {
+    fail(
+      `❌ Could not parse the DTCG JSON: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+
+  const isTokenObject =
+    !!parsed && typeof parsed === "object" && !Array.isArray(parsed);
+  if (!isTokenObject) {
+    fail("❌ The DTCG JSON must contain a token object at the top level.");
+  }
+  // A legacy Style Dictionary document (`value`/`type`/`description`) is
+  // converted to DTCG; a DTCG one passes through unchanged. Types stay where
+  // the document declared them.
+  const incoming = convertToDTCG(parsed as DesignTokens, { applyTypesToGroup: false });
+
+  // flattenTokens keys each leaf as `{a.b.c}`; strip the braces for the path.
+  assertValidPaths(flattenTokens(incoming, true).map((t) => t.key!.slice(1, -1)));
+
+  const filePath = getTokenFilePath(hierarchy);
+
+  const tree =
+    data.mode === "replace"
+      ? incoming
+      : mergeTokenTrees(readTokenFile(filePath), incoming);
+
+  assertTreeValid(tree, hierarchy);
+  writeTokenFile(filePath, tree);
+
+  console.log(`✅ Imported into '${hierarchy}' (${data.mode}).`);
 }
