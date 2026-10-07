@@ -80,12 +80,12 @@ describe("create-token", () => {
     expect(result.output).toContain("Hierarchy violation");
   });
 
-  it("rejects a path segment that is not kebab-case", () => {
+  it("rejects a path segment that is not a valid DTCG name", () => {
     const result = runScript(
       "create-token.ts",
       [
         "--hierarchy", "universal",
-        "--base", "Color.Bad_Segment",
+        "--base", "color.{bad}",
         "--value", "#000000",
         "--token-type", "color",
         "--description", "bad name",
@@ -94,8 +94,7 @@ describe("create-token", () => {
     );
 
     expect(result.status).not.toBe(0);
-    expect(result.output).toContain("Segment 'Color'");
-    expect(result.output).toContain("Segment 'Bad_Segment'");
+    expect(result.output).toContain("Segment '{bad}'");
   });
 });
 

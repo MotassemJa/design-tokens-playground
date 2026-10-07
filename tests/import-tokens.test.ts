@@ -182,14 +182,23 @@ describe("import-tokens — replace", () => {
 describe("import-tokens — validation", () => {
   it("lists every malformed path at once", () => {
     const result = runImport({
-      Color: { Blue_500: { $value: "#3B82F6", $type: "color" } },
-      space: { Bad_Segment: { $value: "4px", $type: "dimension" } },
+      "{color}": { "{blue}": { $value: "#3B82F6", $type: "color" } },
+      space: { "{bad}": { $value: "4px", $type: "dimension" } },
     });
 
     expect(result.status).not.toBe(0);
-    expect(result.output).toContain("Segment 'Color'");
-    expect(result.output).toContain("Segment 'Blue_500'");
-    expect(result.output).toContain("Segment 'Bad_Segment'");
+    expect(result.output).toContain("Segment '{color}'");
+    expect(result.output).toContain("Segment '{blue}'");
+    expect(result.output).toContain("Segment '{bad}'");
+  });
+
+  it("accepts camelCase names", () => {
+    const result = runImport({
+      text: { lineHeights: { $type: "number", normal: { $value: 1.2 } } },
+    });
+
+    expect(result.status).toBe(0);
+    expect((readHierarchy("universal") as any).text.lineHeights.normal.$value).toBe(1.2);
   });
 
   it("accepts a reference to a layer below", () => {

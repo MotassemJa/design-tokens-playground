@@ -11,7 +11,7 @@ body:
         Identify the token with the four **Curtis Nathan** groups and provide the new value.
         Select the hierarchy from the dropdown — do **not** include it in the path.
 
-        All segments are **lowercase kebab-case**. Hierarchy rules still apply — each layer may
+        All segments are valid **DTCG names**. Hierarchy rules still apply — each layer may
         reference any layer **below** it:
         - `design-values` → (nothing)
         - `universal` → `design-values`

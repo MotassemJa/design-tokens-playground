@@ -52,8 +52,9 @@ Any other filename or subdirectory is rejected by `TokenLoader.assertLayoutStric
 
 ## Token Naming (Curtis Nathan)
 
-Paths are always `{namespace}.{object}.{base}.{modifier}` with all segments
-in lowercase kebab-case. See README.md for full examples.
+Paths are always `{namespace}.{object}.{base}.{modifier}`. Each segment is any
+valid DTCG name (any casing); paths that collide as CSS or JS names are rejected.
+See README.md for full examples.
 
 ## Build Commands
 

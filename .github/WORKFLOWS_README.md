@@ -220,7 +220,7 @@ set before writing, not just the file being touched:
 5. **Reference still points at it** (delete, or `import --mode replace`): another
    layer references the token being removed, so the write is refused
 6. **Malformed document** (import): The JSON did not parse, or a path segment is not
-   kebab-case — the script logs every offending path in one run
+   a valid DTCG name — the script logs every offending path in one run
 7. **No changes**: every token in the request already matches the file
 8. **Issue was never created** (import): a body over 65,536 characters is rejected by
    GitHub on submit, so no workflow ever ran — see [Size ceiling](#size-ceiling)

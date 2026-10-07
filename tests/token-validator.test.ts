@@ -4,14 +4,16 @@ import { TokenValidator } from "../src/token-validator.js";
 import { loadFixtureTokensByHierarchy, validateFixture } from "./test-helpers.js";
 
 describe("TokenValidator.validatePath", () => {
-  it("accepts kebab-case dotted paths", () => {
+  it("accepts any casing DTCG allows", () => {
     expect(TokenValidator.validatePath("color.brand-primary.500")).toEqual([]);
+    expect(TokenValidator.validatePath("text.lineHeights.Large_1")).toEqual([]);
   });
 
-  it("rejects invalid path segments", () => {
-    expect(TokenValidator.validatePath("Color.brand_primary")).toEqual([
-      "Segment 'Color' in path 'Color.brand_primary' is not kebab-case (lowercase letters, digits, '-' only).",
-      "Segment 'brand_primary' in path 'Color.brand_primary' is not kebab-case (lowercase letters, digits, '-' only).",
+  it("rejects segments that break the DTCG name rules", () => {
+    expect(TokenValidator.validatePath("color.{blue}.$500..x")).toEqual([
+      "Segment '{blue}' in path 'color.{blue}.$500..x' is not a valid DTCG name (must be non-empty, not start with '$', and not contain '{' or '}').",
+      "Segment '$500' in path 'color.{blue}.$500..x' is not a valid DTCG name (must be non-empty, not start with '$', and not contain '{' or '}').",
+      "Segment '' in path 'color.{blue}.$500..x' is not a valid DTCG name (must be non-empty, not start with '$', and not contain '{' or '}').",
     ]);
   });
 });
@@ -29,8 +31,8 @@ describe("TokenValidator", () => {
 
     expect(validator.getErrors()).toEqual(
       expect.arrayContaining([
-        expect.stringContaining("Segment 'Color'"),
-        expect.stringContaining("Segment 'Blue_500'"),
+        expect.stringContaining("Segment '{blue}'"),
+        expect.stringContaining("Segment '$primary'"),
       ])
     );
   });
@@ -53,6 +55,19 @@ describe("TokenValidator", () => {
       expect.arrayContaining([
         expect.stringContaining("Tries to reference does.not.exist, which is not defined."),
       ])
+    );
+  });
+
+  it("reports two paths that become the same platform name", () => {
+    const tokensByHierarchy = new Map<Hierarchy, DesignTokens>([
+      ["universal", { text: { $type: "number", lineHeights: { normal: { $value: 1.2 } } } }],
+      ["system", { text: { $type: "number", "line-heights": { normal: { $value: 1.5 } } } }],
+    ]);
+    const validator = new TokenValidator();
+
+    expect(validator.validate(tokensByHierarchy)).toBe(false);
+    expect(validator.getErrors()).toContain(
+      "Tokens 'text.lineHeights.normal' and 'text.line-heights.normal' both become 'text-line-heights-normal' (name/kebab)."
     );
   });
 

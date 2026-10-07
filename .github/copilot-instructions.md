@@ -45,7 +45,7 @@ Runtime targets: Node.js 20+, npm 10+ (see README/DEVELOPMENT.md and tsconfig.js
 
 - Token format: DTCG-style entries with required properties `"$value"` and `"$type"` (optionally `$description`, `$extensions`). Copilot should assume this format when suggesting token edits.
 - Token hierarchy: Exactly five layers — `design-values`, `universal`, `system`, `semantic`, `component`. Each layer lives in `tokens/{layer}/tokens.json`. No other directories or filenames are accepted.
-- Naming convention (Curtis Nathan): All token path segments are **lowercase kebab-case**. Path structure is `{namespace}.{object}.{base}.{modifier}` where the groups map to:
+- Naming convention (Curtis Nathan): All token path segments are valid **DTCG names** (no leading `$`, no `{`, `}` or `.`; any casing), and no two paths may produce the same CSS/JS name. Path structure is `{namespace}.{object}.{base}.{modifier}` where the groups map to:
   - `namespace` = `system.theme.domain` (encodes the layer context, e.g. `system.light.color`)
   - `object` = `group.component.element` (e.g. `button.primary.text`)
   - `base` = `category.concept.property` (e.g. `color` or `space.padding`)

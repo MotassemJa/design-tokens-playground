@@ -162,8 +162,8 @@ export function getNested(
   let current: DesignToken | DesignTokens | undefined = tree;
   for (const p of parts) {
     if (current && typeof current === "object" && p in current) {
-      // A path segment is never a DTCG metadata key: `$type` is not kebab-case,
-      // so assertValidPath rejects it long before we walk it.
+      // A path segment is never a DTCG metadata key: a leading `$` is not a
+      // valid name, so assertValidPaths rejects it long before we walk it.
       current = (current as DesignTokens)[p] as DesignToken | DesignTokens | undefined;
     } else {
       return undefined;

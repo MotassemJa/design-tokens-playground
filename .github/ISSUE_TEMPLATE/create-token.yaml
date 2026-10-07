@@ -33,7 +33,7 @@ body:
         | `component`     | `design-values`, `universal`, `system`, `semantic`     | `color.background.solid` → `{semantic.color.action.primary}` |
 
         **Rules**
-        - Every segment is **lowercase kebab-case** (`on-brand`, `primary-text`).
+        - Every segment is a valid **DTCG name**: any casing, no leading `$`, no `{` `}` `.`.
         - The hierarchy is selected separately — do **not** include it in the token path.
         - `design-values` tokens hold raw primitive values only (no `{ref}`).
         - Each layer may reference any layer that is **below** it in the hierarchy.
@@ -144,7 +144,7 @@ body:
       options:
         - label: The hierarchy is one of `design-values` / `universal` / `system` / `semantic` / `component`.
           required: true
-        - label: All segments in every group are lowercase `kebab-case`.
+        - label: All segments in every group are valid DTCG names.
           required: true
         - label: The `$value` references only tokens from a layer **below** this one (or is a raw value for `design-values`).
           required: true

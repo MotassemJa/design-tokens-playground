@@ -86,7 +86,7 @@ src/
 tests/
   fixtures/
     valid/                  # happy-path fixture (all 5 layers)
-    invalid-naming/         # breaks Curtis Nathan kebab-case rule
+    invalid-naming/         # breaks the DTCG name rules
     invalid-hierarchy/      # universal token referencing another layer
     invalid-reference/      # unresolved {path.to.token}
   token-loader.test.ts
@@ -118,7 +118,9 @@ Every token path has four group slots:
 | base       | category / concept / property                      | `color.background`              |
 | modifier   | variant / state / scale / mode                     | `hover.on-light` or _(empty)_   |
 
-- Every segment must be **lowercase kebab-case** (`on-brand`, `primary-text`, `500`).
+- Every segment must be a valid **DTCG name**: not empty, no leading `$`, no `{`, `}` or `.`.
+  Casing is free (`on-brand`, `lineHeights`, `500`); the build derives each platform's casing.
+- Two paths that become the same CSS or JS name (`lineHeights` / `line-heights`) are rejected.
 - The first segment (from `namespace`) must be one of `universal`, `system`, `semantic`, `component`.
 - References may only point one layer up:
   universal → (none), system → universal, semantic → system, component → semantic.
@@ -162,8 +164,8 @@ fully implement all requirements from the current DTCG draft modules.
 
 - `$type` is treated as a string and is not strictly validated against the full
   DTCG type set in this repository's own validator.
-- Naming validation is stricter than the DTCG format in places (project-specific
-  kebab-case constraints), which can reject some otherwise valid DTCG token files.
+- Naming validation is stricter than the DTCG format in two places: a path needs at
+  least two segments, and two paths may not map to the same CSS or JS name.
 - Group reserved-key behavior from DTCG (for example `$extends`, `$root`) is not
   fully modeled in static validation logic.
 
@@ -251,7 +253,7 @@ converted to it) and is not otherwise normalized — in particular
 }
 ```
 
-Paths carry no hierarchy prefix, every segment is lowercase `kebab-case`, and a
+Paths carry no hierarchy prefix, every segment is a valid DTCG name, and a
 layer may reference only itself and layers below it. Malformed paths are all
 reported in one run.
 

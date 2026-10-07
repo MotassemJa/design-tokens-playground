@@ -30,7 +30,7 @@ body:
 
         **Rules** (the same ones every token change obeys)
 
-        - Every path segment is lowercase `kebab-case` — `on-brand`, `primary-text`.
+        - Every path segment is a valid DTCG name — any casing, no leading `$`, no `{` `}` `.`.
         - Paths carry **no hierarchy prefix**; the hierarchy is the dropdown below.
         - Each layer may reference only itself and layers **below** it:
           `design-values` ← `universal` ← `system` ← `semantic` ← `component`.
@@ -119,7 +119,7 @@ body:
       options:
         - label: The JSON is DTCG-conform and parses.
           required: true
-        - label: All path segments are lowercase `kebab-case`, with no hierarchy prefix.
+        - label: All path segments are valid DTCG names, with no hierarchy prefix.
           required: true
         - label: Every `$value` reference points at this layer or one **below** it.
           required: true
