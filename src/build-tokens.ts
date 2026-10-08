@@ -2,7 +2,7 @@ import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import StyleDictionary from "style-dictionary";
 import { stripMeta } from "style-dictionary/utils";
-import { TokenLoader } from "./token-loader.js";
+import { ALLOWED_HIERARCHIES, TOKEN_FILENAME, TOKENS_ROOT, TokenLoader } from "./token-loader.js";
 import { TokenValidator } from "./token-validator.js";
 import { BuildConfig, type BuildOptions } from "./build-config.js";
 
@@ -36,9 +36,10 @@ export async function buildTokens(options: BuildOptions = {}) {
 
   console.log("🔨 Building design tokens...");
 
-  // Load source tokens — by hierarchy for validation, merged for build
+  // Load tokens by hierarchy for validation; Style Dictionary reads the same
+  // files itself for the build, lowest layer first.
   const tokensByHierarchy = tokenLoader.loadTokensByHierarchy();
-  const allTokens = tokenLoader.loadTokens();
+  const source = ALLOWED_HIERARCHIES.map((hierarchy) => join(TOKENS_ROOT, hierarchy, TOKEN_FILENAME));
   const validator = new TokenValidator();
 
   if (!validator.validate(tokensByHierarchy)) {
@@ -61,7 +62,7 @@ export async function buildTokens(options: BuildOptions = {}) {
     generateJson,
     generateCss,
     generateJs,
-  }).createConfig(allTokens);
+  }).createConfig(source);
 
   const sd = new StyleDictionary(config);
 
@@ -74,7 +75,7 @@ export async function buildTokens(options: BuildOptions = {}) {
     // otherwise untouched. It writes the value-only tree itself; the resolved
     // tree that keeps each token's metadata is exported from it below.
     const resolver = new StyleDictionary({
-      tokens: allTokens,
+      source,
       platforms: {
         resolved: {
           buildPath: `${outputDir}/`,
@@ -88,7 +89,10 @@ export async function buildTokens(options: BuildOptions = {}) {
       keep: DTCG_PROPS,
     });
 
-    writeFileSync(join(process.cwd(), outputDir, "tokens.json"), JSON.stringify(allTokens, null, 2));
+    // The merged tree before any platform resolves it: references stay as written.
+    const rawTokens = stripMeta(sd.tokens, { usesDtcg: true, keep: DTCG_PROPS });
+
+    writeFileSync(join(process.cwd(), outputDir, "tokens.json"), JSON.stringify(rawTokens, null, 2));
     writeFileSync(join(process.cwd(), outputDir, "tokens.resolved.json"), JSON.stringify(resolvedTokens, null, 2));
   }
 

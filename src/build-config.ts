@@ -1,6 +1,5 @@
 import type {
   Config,
-  DesignTokens,
   File,
   PlatformConfig,
 } from "style-dictionary/types";
@@ -92,10 +91,10 @@ export class BuildConfig {
   /**
    * Creates the full Style Dictionary config object for the active run.
    *
-   * @param tokens Token tree to pass into Style Dictionary.
+   * @param source Token files for Style Dictionary to read and merge.
    * @returns Full Style Dictionary config with enabled platforms.
    */
-  createConfig(tokens: DesignTokens): Config {
+  createConfig(source: string[]): Config {
     const platforms: Record<string, PlatformConfig> = {};
 
     if (this.options.generateCss) platforms.css = this.createCssPlatform();
@@ -103,7 +102,7 @@ export class BuildConfig {
     if (this.options.generateTypes) platforms.ts = this.createTsPlatform();
 
     return {
-      tokens,
+      source,
       platforms,
       log: {
         errors: {
