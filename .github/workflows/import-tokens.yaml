@@ -124,16 +124,20 @@ jobs:
             const hierarchy = process.env.HIERARCHY.replace(/[^a-z-]/g, '');
             const tokenFile = `tokens/${hierarchy}/tokens.json`;
 
-            const entries = (node, prefix = '') => {
+            // Token path -> the token as JSON. Only tokens are listed; group
+            // metadata ($type, $description, …) is not. A group's $type is
+            // folded into each token below it, so retyping a group shows its
+            // tokens as updated.
+            const entries = (node, prefix = '', inheritedType) => {
               const out = {};
               if (node && typeof node === 'object' && '$value' in node) {
-                out[prefix] = JSON.stringify(node);
+                out[prefix] = JSON.stringify({ ...node, $type: node.$type ?? inheritedType });
                 return out;
               }
+              const type = node?.$type ?? inheritedType;
               for (const [key, child] of Object.entries(node ?? {})) {
-                const path = prefix ? `${prefix}.${key}` : key;
-                if (key.startsWith('$')) out[path] = JSON.stringify(child);
-                else if (child && typeof child === 'object') Object.assign(out, entries(child, path));
+                if (key.startsWith('$') || !child || typeof child !== 'object') continue;
+                Object.assign(out, entries(child, prefix ? `${prefix}.${key}` : key, type));
               }
               return out;
             };
