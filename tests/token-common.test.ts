@@ -19,7 +19,49 @@ function readHierarchy(hierarchy: string): DesignTokens {
   );
 }
 
+/** Adds a `colors` group typed `color` to design-values, with one token. */
+function seedTypedGroup(black: DesignToken = { $value: "#000000" }): void {
+  const file = join(workspace, "tokens", "design-values", "tokens.json");
+  const tree = JSON.parse(readFileSync(file, "utf8"));
+  tree.colors = { $type: "color", black };
+  writeFileSync(file, JSON.stringify(tree, null, 2));
+}
+
 describe("create-token", () => {
+  it("leaves $type off a token whose group already supplies it", () => {
+    seedTypedGroup();
+
+    const result = runScript(
+      "create-token.ts",
+      [
+        "--hierarchy", "design-values",
+        "--base", "colors.pink",
+        "--value", "#FFC0CB",
+        "--token-type", "color",
+        "--description", "pink",
+      ],
+      workspace,
+    );
+
+    expect(result.status).toBe(0);
+    expect((readHierarchy("design-values") as any).colors.pink).toEqual({
+      $value: "#FFC0CB",
+      $description: "pink",
+    });
+  });
+
+  it("keeps $type on a token whose type differs from its group's", () => {
+    seedTypedGroup();
+
+    runScript(
+      "create-token.ts",
+      ["--hierarchy", "design-values", "--base", "colors.opacity", "--value", "0.5", "--token-type", "number"],
+      workspace,
+    );
+
+    expect((readHierarchy("design-values") as any).colors.opacity).toEqual({ $value: 0.5, $type: "number" });
+  });
+
   it("resolves references against every hierarchy, not just the one being written", () => {
     // `semantic` references a `system` token. While the tree was validated in
     // isolation this failed, which broke every create outside `design-values`.
@@ -202,6 +244,18 @@ describe("update-token", () => {
     expect(leaf.$type).toBe("dimension");
     expect(leaf.$description).toBe("rewritten");
     expect(leaf.$extensions).toEqual({ "com.example.tool": { id: "abc123" } });
+  });
+
+  it("drops the token's own $type when it now matches the group's", () => {
+    seedTypedGroup({ $value: "#000000", $type: "dimension" });
+
+    runScript(
+      "update-token.ts",
+      ["--hierarchy", "design-values", "--base", "colors.black", "--value", "#000000", "--token-type", "color"],
+      workspace,
+    );
+
+    expect((readHierarchy("design-values") as any).colors.black).toEqual({ $value: "#000000" });
   });
 
   it("rejects an update to a token that does not exist", () => {

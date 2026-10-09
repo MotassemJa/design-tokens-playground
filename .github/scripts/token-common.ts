@@ -255,6 +255,32 @@ export function assertTreeValid(tree: DesignTokens, hierarchy: Hierarchy): void 
 }
 
 /**
+ * The `$type` a token at `tokenPath` inherits: that of its nearest ancestor
+ * group carrying one, if any.
+ */
+export function inheritedType(tree: DesignTokens, tokenPath: string): string | undefined {
+  let type = tree.$type;
+  let node: unknown = tree;
+  for (const part of tokenPath.split(".").slice(0, -1)) {
+    node = (node as DesignTokens)[part];
+    if (!node || typeof node !== "object") break;
+    const groupType = (node as DesignTokens).$type;
+    if (typeof groupType === "string") type = groupType;
+  }
+  return type;
+}
+
+/**
+ * Gives a leaf the requested `$type`, writing it on the leaf only where a
+ * group does not already supply it. A leaf whose own `$type` matches the
+ * inherited one drops it, so the group stays the single source.
+ */
+function applyType(leaf: DesignToken, type: string, inherited: string | undefined): void {
+  if (type === inherited) delete leaf.$type;
+  else leaf.$type = type;
+}
+
+/**
  * Creates a token under the correct hierarchy bucket.
  */
 export function createToken(data: TokenData): void {
@@ -273,8 +299,7 @@ export function createToken(data: TokenData): void {
   }
 
   const leaf = parseTokenValue(data.value ?? "");
-  console.log(JSON.stringify(leaf, null, 2));
-  if (data.tokenType) leaf.$type = data.tokenType;
+  if (data.tokenType) applyType(leaf, data.tokenType, inheritedType(tree, tokenPath));
   if (data.description) leaf.$description = data.description;
 
   setNested(tree, tokenPath, leaf);
@@ -307,7 +332,7 @@ export function updateToken(data: TokenData): void {
     ...(existing as DesignToken),
     ...parseTokenValue(data.value ?? ""),
   };
-  if (data.tokenType) leaf.$type = data.tokenType;
+  if (data.tokenType) applyType(leaf, data.tokenType, inheritedType(tree, tokenPath));
   if (data.description) leaf.$description = data.description;
 
   setNested(tree, tokenPath, leaf);
